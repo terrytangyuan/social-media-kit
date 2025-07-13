@@ -32,7 +32,14 @@ function App() {
   }>>([]);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [showPostManager, setShowPostManager] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'bluesky'>('linkedin');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const PLATFORM_LIMITS = {
+    linkedin: 3000, // LinkedIn doesn't have strict limit, but 3000 is good practice
+    twitter: 280,
+    bluesky: 300
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("linkedinDraft");
@@ -395,6 +402,66 @@ function App() {
     "Symbols": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳", "🈶", "🈚", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️", "㊗️", "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️", "🆘", "❌", "⭕", "🛑", "⛔", "📛", "🚫", "💯", "💢", "♨️", "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "🚭", "❗", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "〽️", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "✅", "🈯", "💹", "❇️", "✳️", "❎", "🌐", "💠", "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂", "🛃", "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶", "🈁", "🔣", "ℹ️", "🔤", "🔡", "🔠", "🆖", "🆗", "🆙", "🆒", "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟", "🔢", "#️⃣", "*️⃣", "⏏️", "▶️", "⏸️", "⏯️", "⏹️", "⏺️", "⏭️", "⏮️", "⏩", "⏪", "⏫", "⏬", "◀️", "🔼", "🔽", "➡️", "⬅️", "⬆️", "⬇️", "↗️", "↘️", "↙️", "↖️", "↕️", "↔️", "↪️", "↩️", "⤴️", "⤵️", "🔀", "🔁", "🔂", "🔄", "🔃", "🎵", "🎶", "➕", "➖", "➗", "✖️", "♾️", "💲", "💱", "™️", "©️", "®️", "〰️", "➰", "➿", "🔚", "🔙", "🔛", "🔝", "🔜", "✔️", "☑️", "🔘", "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔸", "🔹", "🔶", "🔷", "🔳", "🔲", "▪️", "▫️", "◾", "◽", "◼️", "◻️", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "⬛", "⬜", "🟫", "🔈", "🔇", "🔉", "🔊", "🔔", "🔕", "📣", "📢", "👁️‍🗨️", "💬", "💭", "🗯️", "♠️", "♣️", "♥️", "♦️", "🃏", "🎴", "🀄", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛", "🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦", "🕧"]
   };
 
+  const chunkText = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string[] => {
+    const limit = PLATFORM_LIMITS[platform];
+    
+    if (text.length <= limit) {
+      return [text];
+    }
+    
+    const chunks: string[] = [];
+    let remainingText = text;
+    
+    while (remainingText.length > 0) {
+      if (remainingText.length <= limit) {
+        chunks.push(remainingText);
+        break;
+      }
+      
+      // Try to break at natural points
+      let breakPoint = limit;
+      
+      // Look for sentence ending
+      const sentenceEnd = remainingText.lastIndexOf('.', limit);
+      const questionEnd = remainingText.lastIndexOf('?', limit);
+      const exclamationEnd = remainingText.lastIndexOf('!', limit);
+      
+      const sentenceBreak = Math.max(sentenceEnd, questionEnd, exclamationEnd);
+      
+      if (sentenceBreak > limit * 0.7) {
+        breakPoint = sentenceBreak + 1;
+      } else {
+        // Look for paragraph break
+        const paragraphBreak = remainingText.lastIndexOf('\n\n', limit);
+        if (paragraphBreak > limit * 0.5) {
+          breakPoint = paragraphBreak;
+        } else {
+          // Look for single line break
+          const lineBreak = remainingText.lastIndexOf('\n', limit);
+          if (lineBreak > limit * 0.7) {
+            breakPoint = lineBreak;
+          } else {
+            // Look for word boundary
+            const spaceBreak = remainingText.lastIndexOf(' ', limit);
+            if (spaceBreak > limit * 0.8) {
+              breakPoint = spaceBreak;
+            }
+          }
+        }
+      }
+      
+      chunks.push(remainingText.substring(0, breakPoint).trim());
+      remainingText = remainingText.substring(breakPoint).trim();
+    }
+    
+    return chunks;
+  };
+
+  const formatForPlatform = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
+    // All platforms support Unicode styled text
+    return toUnicodeStyle(text);
+  };
+
   const toUnicodeStyle = (text: string): string => {
     let result = text;
     
@@ -433,16 +500,25 @@ function App() {
 
   const handleCopyStyled = async () => {
     try {
-      const unicodeText = toUnicodeStyle(text);
+      const chunks = chunkText(text, selectedPlatform);
+      const formattedChunks = chunks.map((chunk) => {
+        return formatForPlatform(chunk, selectedPlatform);
+      });
+      
+      const finalText = formattedChunks.join('\n\n---\n\n');
       
       // Try modern clipboard API first
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(unicodeText);
-        alert("✅ Stylized text copied to clipboard! You can now paste it into LinkedIn.");
+        await navigator.clipboard.writeText(finalText);
+        const platform = selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1);
+        const message = chunks.length > 1 
+          ? `✅ ${platform} thread (${chunks.length} parts) copied to clipboard!`
+          : `✅ ${platform} post copied to clipboard!`;
+        alert(message);
       } else {
         // Fallback for older browsers or non-secure contexts
         const textArea = document.createElement("textarea");
-        textArea.value = unicodeText;
+        textArea.value = finalText;
         textArea.style.position = "fixed";
         textArea.style.left = "-999999px";
         textArea.style.top = "-999999px";
@@ -454,14 +530,18 @@ function App() {
         document.body.removeChild(textArea);
         
         if (successful) {
-          alert("✅ Stylized text copied to clipboard! You can now paste it into LinkedIn.");
+          const platform = selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1);
+          const message = chunks.length > 1 
+            ? `✅ ${platform} thread (${chunks.length} parts) copied to clipboard!`
+            : `✅ ${platform} post copied to clipboard!`;
+          alert(message);
         } else {
           throw new Error("Copy command failed");
         }
       }
     } catch (err) {
       console.error('Copy failed:', err);
-      alert("❌ Failed to copy stylized text. Please manually copy the text from the preview below.");
+      alert("❌ Failed to copy text. Please manually copy the text from the preview below.");
     }
   };
 
@@ -722,9 +802,39 @@ function App() {
           onChange={(e) => setText(e.target.value)}
         />
 
+        <div className="mb-4">
+          <label className={`block mb-2 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Platform
+          </label>
+          <div className="flex gap-2 mb-3">
+            {[
+              { key: 'linkedin', label: 'LinkedIn', icon: '💼' },
+              { key: 'twitter', label: 'X/Twitter', icon: '🐦' },
+              { key: 'bluesky', label: 'Bluesky', icon: '🦋' }
+            ].map((platform) => (
+              <button
+                key={platform.key}
+                onClick={() => setSelectedPlatform(platform.key as any)}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                  selectedPlatform === platform.key
+                    ? (darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white")
+                    : (darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300")
+                }`}
+              >
+                {platform.icon} {platform.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className={`flex justify-between items-center mb-4 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
           <span>{text.trim() ? text.trim().split(/\s+/).length : 0} words</span>
-          <span>{text.length} characters</span>
+          <div className="flex gap-4">
+            <span>{text.length} characters</span>
+            <span className={`${text.length > PLATFORM_LIMITS[selectedPlatform] ? 'text-red-500' : 'text-green-500'}`}>
+              Limit: {PLATFORM_LIMITS[selectedPlatform]}
+            </span>
+          </div>
         </div>
 
         <div className="mb-4">
@@ -813,13 +923,18 @@ function App() {
 
         <div className="flex gap-2 mb-4">
           <button onClick={handleCopyStyled} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">
-            📋 Copy Stylized for LinkedIn
+            📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
           </button>
           <button 
             onClick={() => {
-              const styledText = toUnicodeStyle(text);
+              const chunks = chunkText(text, selectedPlatform);
+              const formattedChunks = chunks.map((chunk) => {
+                return formatForPlatform(chunk, selectedPlatform);
+              });
+              const finalText = formattedChunks.join('\n\n---\n\n');
+              
               const tempDiv = document.createElement('div');
-              tempDiv.textContent = styledText;
+              tempDiv.textContent = finalText;
               tempDiv.style.position = 'absolute';
               tempDiv.style.left = '-9999px';
               document.body.appendChild(tempDiv);
@@ -836,18 +951,78 @@ function App() {
             }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl"
           >
-            🖱️ Select All Styled Text
+            🖱️ Select All Text
           </button>
         </div>
 
 
 
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-2">Live Preview</h2>
-          <div className={`prose max-w-none p-4 border rounded-xl ${darkMode ? "prose-invert bg-gray-700 border-gray-600 text-white" : "bg-gray-50 border-gray-300 text-gray-800"}`}
-            dangerouslySetInnerHTML={{ __html: getMarkdownPreview() }}
-          />
-        </div>
+
+
+        {text.trim() && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-2">
+              {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'} Preview
+            </h2>
+            {(() => {
+              const chunks = chunkText(text, selectedPlatform);
+              const formattedChunks = chunks.map((chunk) => {
+                return formatForPlatform(chunk, selectedPlatform);
+              });
+              
+              return (
+                <div className="space-y-4">
+                  {chunks.length > 1 && (
+                    <div className={`text-sm p-2 rounded-lg ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+                      📱 This post will be split into {chunks.length} parts due to character limit ({PLATFORM_LIMITS[selectedPlatform]} chars)
+                    </div>
+                  )}
+                  {formattedChunks.map((chunk, index) => (
+                    <div key={index} className={`p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-50 border-gray-300 text-gray-800"}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        {chunks.length > 1 && (
+                          <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            Part {index + 1} of {chunks.length} • {chunk.length} characters
+                          </div>
+                        )}
+                        {(selectedPlatform === 'twitter' || selectedPlatform === 'bluesky') && chunks.length > 1 && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                if (navigator.clipboard && window.isSecureContext) {
+                                  await navigator.clipboard.writeText(chunk);
+                                } else {
+                                  const textArea = document.createElement("textarea");
+                                  textArea.value = chunk;
+                                  textArea.style.position = "fixed";
+                                  textArea.style.left = "-999999px";
+                                  textArea.style.top = "-999999px";
+                                  document.body.appendChild(textArea);
+                                  textArea.focus();
+                                  textArea.select();
+                                  document.execCommand('copy');
+                                  document.body.removeChild(textArea);
+                                }
+                                alert(`✅ Part ${index + 1} copied to clipboard!`);
+                              } catch (err) {
+                                console.error('Copy failed:', err);
+                                alert('❌ Failed to copy. Please select and copy manually.');
+                              }
+                            }}
+                            className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                          >
+                            📋 Copy
+                          </button>
+                        )}
+                      </div>
+                      <div className="whitespace-pre-wrap">{chunk}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
