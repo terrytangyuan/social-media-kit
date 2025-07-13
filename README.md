@@ -4,13 +4,26 @@ A comprehensive social media management tool designed to help you create, format
 
 ## 📸 Screenshots
 
-### Main Interface - LinkedIn Preview
-![Social Media Kit Main Interface](screenshots/main-interface.png)
-*Main interface showing LinkedIn post composition with real-time preview, platform selection, and formatting tools*
-
-### Smart Text Chunking - Twitter/X Preview  
-![Twitter Text Chunking](screenshots/twitter-chunking.png)
-*Intelligent text splitting for Twitter/X - automatically breaks long posts into threaded parts while respecting character limits*
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="screenshots/main-interface.png" alt="Social Media Kit Main Interface" width="400"/>
+        <br/>
+        <strong>Main Interface - LinkedIn Preview</strong>
+        <br/>
+        <em>Clean interface with LinkedIn post composition, real-time preview, platform selection, and formatting tools</em>
+      </td>
+      <td align="center">
+        <img src="screenshots/twitter-chunking.png" alt="Twitter Text Chunking" width="400"/>
+        <br/>
+        <strong>Smart Text Chunking - Twitter/X Preview</strong>
+        <br/>
+        <em>Intelligent text splitting for Twitter/X - automatically breaks long posts into threaded parts while respecting character limits</em>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
