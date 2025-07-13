@@ -8,15 +8,22 @@ function App() {
   const [scheduleTime, setScheduleTime] = useState("");
   const [notificationScheduled, setNotificationScheduled] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiSearch, setEmojiSearch] = useState("");
+  const [timezone, setTimezone] = useState(() => {
+    const saved = localStorage.getItem("timezone");
+    return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("linkedinDraft");
     const dark = localStorage.getItem("darkMode");
     const schedule = localStorage.getItem("scheduleTime");
+    const savedTimezone = localStorage.getItem("timezone");
     if (saved) setText(saved);
     if (dark === "true") setDarkMode(true);
     if (schedule) setScheduleTime(schedule);
+    if (savedTimezone) setTimezone(savedTimezone);
   }, []);
 
   useEffect(() => {
@@ -30,6 +37,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("scheduleTime", scheduleTime);
   }, [scheduleTime]);
+
+  useEffect(() => {
+    localStorage.setItem("timezone", timezone);
+  }, [timezone]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -87,6 +98,60 @@ function App() {
       textarea.focus();
       textarea.setSelectionRange(start + emoji.length, start + emoji.length);
     }, 0);
+  };
+
+  const commonTimezones = [
+    { value: "America/New_York", label: "Eastern Time (ET)" },
+    { value: "America/Chicago", label: "Central Time (CT)" },
+    { value: "America/Denver", label: "Mountain Time (MT)" },
+    { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+    { value: "America/Phoenix", label: "Arizona Time (MST)" },
+    { value: "America/Anchorage", label: "Alaska Time (AKST)" },
+    { value: "Pacific/Honolulu", label: "Hawaii Time (HST)" },
+    { value: "Europe/London", label: "London (GMT/BST)" },
+    { value: "Europe/Paris", label: "Paris (CET/CEST)" },
+    { value: "Europe/Berlin", label: "Berlin (CET/CEST)" },
+    { value: "Europe/Rome", label: "Rome (CET/CEST)" },
+    { value: "Europe/Madrid", label: "Madrid (CET/CEST)" },
+    { value: "Europe/Amsterdam", label: "Amsterdam (CET/CEST)" },
+    { value: "Europe/Stockholm", label: "Stockholm (CET/CEST)" },
+    { value: "Europe/Moscow", label: "Moscow (MSK)" },
+    { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+    { value: "Asia/Shanghai", label: "Shanghai (CST)" },
+    { value: "Asia/Hong_Kong", label: "Hong Kong (HKT)" },
+    { value: "Asia/Singapore", label: "Singapore (SGT)" },
+    { value: "Asia/Seoul", label: "Seoul (KST)" },
+    { value: "Asia/Kolkata", label: "India (IST)" },
+    { value: "Asia/Dubai", label: "Dubai (GST)" },
+    { value: "Australia/Sydney", label: "Sydney (AEST/AEDT)" },
+    { value: "Australia/Melbourne", label: "Melbourne (AEST/AEDT)" },
+    { value: "Australia/Perth", label: "Perth (AWST)" },
+    { value: "Pacific/Auckland", label: "Auckland (NZST/NZDT)" },
+    { value: "America/Toronto", label: "Toronto (ET)" },
+    { value: "America/Vancouver", label: "Vancouver (PT)" },
+    { value: "America/Sao_Paulo", label: "São Paulo (BRT)" },
+    { value: "America/Mexico_City", label: "Mexico City (CST)" },
+    { value: "Africa/Cairo", label: "Cairo (EET)" },
+    { value: "Africa/Johannesburg", label: "Johannesburg (SAST)" }
+  ];
+
+  const formatTimezoneTime = (datetime: string, tz: string) => {
+    if (!datetime) return "";
+    try {
+      const date = new Date(datetime);
+      return date.toLocaleString("en-US", {
+        timeZone: tz,
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short"
+      });
+    } catch {
+      return datetime;
+    }
   };
 
   const emojiCategories = {
@@ -184,14 +249,14 @@ function App() {
 
     const timeout = setTimeout(() => {
       new Notification("⏰ Reminder", {
-        body: "Time to post your content on LinkedIn!",
+        body: `Time to post your content on LinkedIn! (${formatTimezoneTime(scheduleTime, timezone)})`,
       });
       setNotificationScheduled(false);
     }, delay);
 
     setNotificationScheduled(true);
     return () => clearTimeout(timeout);
-  }, [scheduleTime, notificationScheduled]);
+  }, [scheduleTime, notificationScheduled, timezone]);
 
   return (
     <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} min-h-screen p-6`}>
@@ -274,12 +339,33 @@ function App() {
           <label className={`block mb-1 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
             Schedule Post Reminder
           </label>
-          <input
-            type="datetime-local"
-            value={scheduleTime}
-            onChange={(e) => setScheduleTime(e.target.value)}
-            className={`border border-gray-300 rounded-lg px-3 py-2 text-sm ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800"}`}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <input
+              type="datetime-local"
+              value={scheduleTime}
+              onChange={(e) => setScheduleTime(e.target.value)}
+              className={`border border-gray-300 rounded-lg px-3 py-2 text-sm ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800"}`}
+            />
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className={`border border-gray-300 rounded-lg px-3 py-2 text-sm ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800"}`}
+            >
+              <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>
+                🔍 Auto-detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+              </option>
+              {commonTimezones.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {scheduleTime && (
+            <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
+            </p>
+          )}
         </div>
 
         <div className="flex gap-2 mb-4">
