@@ -2,17 +2,15 @@
 
 A comprehensive social media management tool designed to help you create, format, and post content across multiple platforms including LinkedIn, Twitter/X, and Bluesky. Features advanced styling, emoji support, OAuth authentication, and cross-platform posting capabilities.
 
+⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
+
+
 ## 📸 Screenshots
 
 <div align="center">
   <img src="screenshots/main-interface.png" alt="Social Media Kit Main Interface" width="800"/>
-  <br/>
-  <strong>Main Interface - LinkedIn Preview</strong>
-  <br/>
-  <em>Clean interface with LinkedIn post composition, real-time preview, platform selection, and formatting tools</em>
 </div>
 
-⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
 ## 🚀 Features
 
