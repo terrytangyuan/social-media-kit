@@ -13,6 +13,7 @@ function App() {
     const saved = localStorage.getItem("timezone");
     return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
   });
+  const [notificationStatus, setNotificationStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported'>('unknown');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -41,6 +42,26 @@ function App() {
   useEffect(() => {
     localStorage.setItem("timezone", timezone);
   }, [timezone]);
+
+  useEffect(() => {
+    // Check notification status on mount
+    const checkNotificationStatus = () => {
+      if (!("Notification" in window)) {
+        setNotificationStatus('unsupported');
+        return;
+      }
+      
+      if (Notification.permission === 'granted') {
+        setNotificationStatus('granted');
+      } else if (Notification.permission === 'denied') {
+        setNotificationStatus('denied');
+      } else {
+        setNotificationStatus('unknown');
+      }
+    };
+
+    checkNotificationStatus();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -243,19 +264,57 @@ function App() {
 
     if (delay <= 0) return;
 
-    if (Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
+    const setupNotification = async () => {
+      // Check if notifications are supported
+      if (!("Notification" in window)) {
+        alert("❌ This browser doesn't support notifications. Please use a modern browser.");
+        return;
+      }
 
-    const timeout = setTimeout(() => {
-      new Notification("⏰ Reminder", {
-        body: `Time to post your content on LinkedIn! (${formatTimezoneTime(scheduleTime, timezone)})`,
-      });
-      setNotificationScheduled(false);
-    }, delay);
+      // Request permission if not granted
+      if (Notification.permission !== "granted") {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          setNotificationStatus('granted');
+        } else {
+          setNotificationStatus('denied');
+          alert("❌ Notification permission denied. Please enable notifications in your browser settings.");
+          return;
+        }
+      }
 
-    setNotificationScheduled(true);
-    return () => clearTimeout(timeout);
+      console.log(`⏰ Reminder set for ${formatTimezoneTime(scheduleTime, timezone)} (in ${Math.round(delay / 1000)} seconds)`);
+      
+      const timeout = setTimeout(() => {
+        try {
+          // Create notification
+          const notification = new Notification("⏰ LinkedIn Post Reminder", {
+            body: `Time to post your content on LinkedIn!\n${formatTimezoneTime(scheduleTime, timezone)}`,
+            icon: "/favicon.ico",
+            tag: "linkedin-reminder",
+            requireInteraction: true,
+            silent: false
+          });
+
+          // Also show browser alert as fallback
+          alert(`⏰ REMINDER: Time to post your content on LinkedIn!\n\n${formatTimezoneTime(scheduleTime, timezone)}`);
+
+          // Auto-close notification after 10 seconds
+          setTimeout(() => notification.close(), 10000);
+          
+          console.log("✅ Notification triggered successfully");
+        } catch (error) {
+          console.error("❌ Notification error:", error);
+          alert(`⏰ REMINDER: Time to post your content on LinkedIn!\n\n${formatTimezoneTime(scheduleTime, timezone)}`);
+        }
+        setNotificationScheduled(false);
+      }, delay);
+
+      setNotificationScheduled(true);
+      return () => clearTimeout(timeout);
+    };
+
+    setupNotification();
   }, [scheduleTime, notificationScheduled, timezone]);
 
   return (
@@ -366,6 +425,57 @@ function App() {
               📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
             </p>
           )}
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                🔔 Notifications:
+              </span>
+              {notificationStatus === 'granted' && (
+                <span className="text-xs text-green-600">✅ Enabled</span>
+              )}
+              {notificationStatus === 'denied' && (
+                <span className="text-xs text-red-600">❌ Blocked</span>
+              )}
+              {notificationStatus === 'unsupported' && (
+                <span className="text-xs text-orange-600">⚠️ Unsupported</span>
+              )}
+              {notificationStatus === 'unknown' && (
+                <span className="text-xs text-yellow-600">❓ Unknown</span>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                if (!("Notification" in window)) {
+                  alert("❌ This browser doesn't support notifications.");
+                  return;
+                }
+                
+                if (Notification.permission === 'granted') {
+                  new Notification("🧪 Test Notification", {
+                    body: "Notifications are working correctly!",
+                    icon: "/favicon.ico"
+                  });
+                  alert("✅ Test notification sent! Check if you received it.");
+                } else {
+                  const permission = await Notification.requestPermission();
+                  if (permission === 'granted') {
+                    setNotificationStatus('granted');
+                    new Notification("🧪 Test Notification", {
+                      body: "Notifications are now enabled!",
+                      icon: "/favicon.ico"
+                    });
+                    alert("✅ Notifications enabled! Test notification sent.");
+                  } else {
+                    setNotificationStatus('denied');
+                    alert("❌ Please enable notifications in your browser settings.");
+                  }
+                }
+              }}
+              className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-gray-600 hover:bg-gray-500 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"}`}
+            >
+              🧪 Test
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 mb-4">
