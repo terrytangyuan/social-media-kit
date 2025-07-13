@@ -1,12 +1,12 @@
 # Authentication Setup Guide
 
 ## Overview
-The LinkedIn Post Formatter now supports automatic posting to LinkedIn, X/Twitter, and Bluesky platforms. This guide will help you set up authentication for each platform using the built-in settings UI.
+The Social Media Kit supports automatic posting to LinkedIn, X/Twitter, and Bluesky platforms. This guide will help you set up authentication for each platform using the built-in settings UI.
 
 ## Getting Started
 
 ### 1. Access OAuth Settings
-1. Open the LinkedIn Post Formatter application
+1. Open the Social Media Kit application
 2. Click the **⚙️ Settings** button in the top header
 3. The OAuth Settings panel will open with configuration options for all platforms
 

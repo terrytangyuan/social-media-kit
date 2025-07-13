@@ -1,6 +1,7 @@
 {
-  "name": "linkedin-post-formatter",
-  "version": "0.0.1",
+  "name": "social-media-kit",
+  "version": "0.1.0",
+  "description": "A comprehensive social media kit for creating, formatting, and posting content across LinkedIn, Twitter/X, and Bluesky platforms",
   "type": "module",
   "scripts": {
     "dev": "vite",

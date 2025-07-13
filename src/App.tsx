@@ -137,11 +137,11 @@ function App() {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem("linkedinDraft");
+    const saved = localStorage.getItem("socialMediaDraft");
     const dark = localStorage.getItem("darkMode");
     const schedule = localStorage.getItem("scheduleTime");
     const savedTimezone = localStorage.getItem("timezone");
-    const savedPosts = localStorage.getItem("linkedinPosts");
+    const savedPosts = localStorage.getItem("socialMediaPosts");
     const savedAuth = localStorage.getItem("platformAuth");
     const savedOAuthConfig = localStorage.getItem("oauthConfig");
     
@@ -183,7 +183,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("linkedinDraft", text);
+    localStorage.setItem("socialMediaDraft", text);
   }, [text]);
 
   useEffect(() => {
@@ -199,7 +199,7 @@ function App() {
   }, [timezone]);
 
   useEffect(() => {
-    localStorage.setItem("linkedinPosts", JSON.stringify(posts));
+    localStorage.setItem("socialMediaPosts", JSON.stringify(posts));
   }, [posts]);
 
   useEffect(() => {
@@ -454,7 +454,7 @@ function App() {
     
     const link = document.createElement('a');
     link.href = URL.createObjectURL(dataBlob);
-    link.download = `linkedin-posts-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `social-media-posts-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1000,7 +1000,7 @@ function App() {
     <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} min-h-screen p-6`}>
       <div className={`max-w-4xl mx-auto p-6 rounded-2xl shadow-lg ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">LinkedIn Post Formatter</h1>
+          <h1 className="text-2xl font-bold">Social Media Kit</h1>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowPostManager(!showPostManager)}
@@ -1106,7 +1106,7 @@ function App() {
                     <ol className="text-xs space-y-1">
                       <li>1. Log into your Bluesky account</li>
                       <li>2. Go to Settings → Privacy and Security → App Passwords</li>
-                      <li>3. Click "Add App Password" and name it (e.g., "LinkedIn Post Formatter")</li>
+                      <li>3. Click "Add App Password" and name it (e.g., "Social Media Kit")</li>
                       <li>4. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)</li>
                       <li>5. When logging in, use your handle and the app password</li>
                     </ol>
@@ -1266,12 +1266,6 @@ function App() {
         <div className="flex gap-2 mb-2">
           <button onClick={() => applyMarkdown("**")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Bold</button>
           <button onClick={() => applyMarkdown("_")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Italic</button>
-          <button 
-            onClick={saveToDraft}
-            className={`px-3 py-1 rounded-xl text-sm ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
-          >
-            💾 Save to Draft
-          </button>
           <div className="relative emoji-picker-container">
             <button 
               onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
@@ -1314,6 +1308,12 @@ function App() {
               </div>
             )}
           </div>
+          <button 
+            onClick={saveToDraft}
+            className={`px-3 py-1 rounded-xl text-sm ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+          >
+            💾 Save to Draft
+          </button>
         </div>
 
         <textarea
