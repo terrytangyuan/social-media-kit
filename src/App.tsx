@@ -775,6 +775,105 @@ function App() {
     }
   };
 
+  const handlePostToAll = async () => {
+    const connectedPlatforms = (['linkedin', 'twitter', 'bluesky'] as const).filter(
+      platform => auth[platform].isAuthenticated
+    );
+    
+    if (connectedPlatforms.length === 0) {
+      alert('❌ No platforms are connected. Please connect to at least one platform first.');
+      return;
+    }
+    
+    const platformNames = {
+      linkedin: 'LinkedIn',
+      twitter: 'X/Twitter',
+      bluesky: 'Bluesky'
+    };
+    
+    const confirmMessage = `📤 Post to all connected platforms (${connectedPlatforms.map(p => platformNames[p]).join(', ')})?\n\nThis will post your content to ${connectedPlatforms.length} platform${connectedPlatforms.length > 1 ? 's' : ''}.`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    try {
+      setIsPosting(true);
+      const results: Array<{ platform: string; success: boolean; error?: string }> = [];
+      
+      for (const platform of connectedPlatforms) {
+        try {
+          setPostingStatus(`Posting to ${platformNames[platform]}...`);
+          
+          const chunks = chunkText(text, platform);
+          const formattedChunks = chunks.map(chunk => formatForPlatform(chunk, platform));
+          
+          for (let i = 0; i < formattedChunks.length; i++) {
+            const chunk = formattedChunks[i];
+            setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${platformNames[platform]}...`);
+            
+            switch (platform) {
+              case 'linkedin':
+                await postToLinkedIn(chunk);
+                break;
+              case 'twitter':
+                await postToTwitter(chunk);
+                break;
+              case 'bluesky':
+                await postToBluesky(chunk);
+                break;
+            }
+            
+            // Add delay between posts for multi-part content
+            if (i < formattedChunks.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
+          
+          results.push({ platform: platformNames[platform], success: true });
+          
+          // Add delay between platforms
+          if (connectedPlatforms.indexOf(platform) < connectedPlatforms.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+        } catch (error) {
+          console.error(`Error posting to ${platform}:`, error);
+          results.push({ 
+            platform: platformNames[platform], 
+            success: false, 
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+      setPostingStatus('');
+      
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      if (successful.length === results.length) {
+        alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
+        // Clear the text after successful posting to all platforms
+        setText('');
+      } else if (successful.length > 0) {
+        const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
+        const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
+        alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
+      } else {
+        const failMsg = failed.map(r => `${r.platform}: ${r.error}`).join('\n');
+        alert(`❌ Failed to post to all platforms:\n\n${failMsg}`);
+      }
+      
+    } catch (error) {
+      console.error('Post to all error:', error);
+      alert(`❌ Failed to post to all platforms: ${error}`);
+      setPostingStatus('');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
   const emojiCategories = {
     "Smileys & People": ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕"],
     "Animals & Nature": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊️", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿️"],
@@ -1509,6 +1608,26 @@ function App() {
               📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
             </button>
           )}
+          
+          {/* Post to All button */}
+          {(() => {
+            const connectedPlatforms = (['linkedin', 'twitter', 'bluesky'] as const).filter(
+              platform => auth[platform].isAuthenticated
+            );
+            
+            if (connectedPlatforms.length > 1) {
+              return (
+                <button 
+                  onClick={handlePostToAll}
+                  disabled={isPosting}
+                  className={`${isPosting ? 'bg-gray-500' : 'bg-purple-600 hover:bg-purple-700'} text-white px-4 py-2 rounded-xl flex items-center gap-2`}
+                >
+                  {isPosting ? '⏳' : '🚀'} {isPosting ? 'Posting...' : `Post to All (${connectedPlatforms.length})`}
+                </button>
+              );
+            }
+            return null;
+          })()}
 
         </div>
 
