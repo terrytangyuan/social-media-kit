@@ -5,7 +5,15 @@ import DOMPurify from "dompurify";
 function App() {
   const [text, setText] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleTime, setScheduleTime] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  });
   const [notificationScheduled, setNotificationScheduled] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [emojiSearch, setEmojiSearch] = useState("");
@@ -14,6 +22,16 @@ function App() {
     return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
   });
   const [notificationStatus, setNotificationStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported'>('unknown');
+  const [posts, setPosts] = useState<Array<{
+    id: string;
+    title: string;
+    content: string;
+    scheduleTime: string;
+    timezone: string;
+    createdAt: string;
+  }>>([]);
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const [showPostManager, setShowPostManager] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -21,6 +39,21 @@ function App() {
     const dark = localStorage.getItem("darkMode");
     const schedule = localStorage.getItem("scheduleTime");
     const savedTimezone = localStorage.getItem("timezone");
+    const savedPosts = localStorage.getItem("linkedinPosts");
+    
+    if (savedPosts) {
+      const parsedPosts = JSON.parse(savedPosts);
+      setPosts(parsedPosts);
+      // If no current post and we have saved posts, use the first one
+      if (parsedPosts.length > 0 && !saved) {
+        const firstPost = parsedPosts[0];
+        setCurrentPostId(firstPost.id);
+        setText(firstPost.content);
+        setScheduleTime(firstPost.scheduleTime);
+        setTimezone(firstPost.timezone);
+      }
+    }
+    
     if (saved) setText(saved);
     if (dark === "true") setDarkMode(true);
     if (schedule) setScheduleTime(schedule);
@@ -42,6 +75,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("timezone", timezone);
   }, [timezone]);
+
+  useEffect(() => {
+    localStorage.setItem("linkedinPosts", JSON.stringify(posts));
+  }, [posts]);
 
   useEffect(() => {
     // Check notification status on mount
@@ -156,6 +193,16 @@ function App() {
     { value: "Africa/Johannesburg", label: "Johannesburg (SAST)" }
   ];
 
+  const getCurrentDateTimeString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const formatTimezoneTime = (datetime: string, tz: string) => {
     if (!datetime) return "";
     try {
@@ -173,6 +220,96 @@ function App() {
     } catch {
       return datetime;
     }
+  };
+
+  const createNewPost = () => {
+    const currentTime = getCurrentDateTimeString();
+    const newPost = {
+      id: Date.now().toString(),
+      title: `Post ${posts.length + 1}`,
+      content: "",
+      scheduleTime: currentTime,
+      timezone: timezone,
+      createdAt: new Date().toISOString()
+    };
+    setPosts(prev => [...prev, newPost]);
+    setCurrentPostId(newPost.id);
+    setText("");
+    setScheduleTime(currentTime);
+  };
+
+  const saveToDraft = () => {
+    if (!currentPostId) {
+      // Create new post with current content
+      const currentTime = getCurrentDateTimeString();
+      const newPost = {
+        id: Date.now().toString(),
+        title: `Post ${posts.length + 1}`,
+        content: text,
+        scheduleTime: currentTime,
+        timezone: timezone,
+        createdAt: new Date().toISOString()
+      };
+      setPosts(prev => [...prev, newPost]);
+      setCurrentPostId(newPost.id);
+      setScheduleTime(currentTime);
+      return;
+    }
+    
+    // Update existing post with current content
+    setPosts(prev => prev.map(post => 
+      post.id === currentPostId 
+        ? { ...post, content: text, scheduleTime, timezone }
+        : post
+    ));
+  };
+
+  const saveCurrentPost = () => {
+    if (!currentPostId) {
+      createNewPost();
+      return;
+    }
+    
+    setPosts(prev => prev.map(post => 
+      post.id === currentPostId 
+        ? { ...post, content: text, scheduleTime, timezone }
+        : post
+    ));
+  };
+
+  const switchToPost = (postId: string) => {
+    // Save current changes first
+    if (currentPostId) {
+      saveCurrentPost();
+    }
+    
+    const post = posts.find(p => p.id === postId);
+    if (post) {
+      setCurrentPostId(postId);
+      setText(post.content);
+      setScheduleTime(post.scheduleTime);
+      setTimezone(post.timezone);
+    }
+  };
+
+  const deletePost = (postId: string) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    if (currentPostId === postId) {
+      const remainingPosts = posts.filter(p => p.id !== postId);
+      if (remainingPosts.length > 0) {
+        switchToPost(remainingPosts[0].id);
+      } else {
+        setCurrentPostId(null);
+        setText("");
+        setScheduleTime("");
+      }
+    }
+  };
+
+  const updatePostTitle = (postId: string, title: string) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId ? { ...post, title } : post
+    ));
   };
 
   const emojiCategories = {
@@ -256,18 +393,12 @@ function App() {
   };
 
   useEffect(() => {
-    if (!scheduleTime || notificationScheduled) return;
-
-    const now = new Date();
-    const target = new Date(scheduleTime);
-    const delay = target.getTime() - now.getTime();
-
-    if (delay <= 0) return;
-
-    const setupNotification = async () => {
+    // Set up notifications for all scheduled posts
+    const timeouts: number[] = [];
+    
+    const setupNotifications = async () => {
       // Check if notifications are supported
       if (!("Notification" in window)) {
-        alert("❌ This browser doesn't support notifications. Please use a modern browser.");
         return;
       }
 
@@ -278,61 +409,174 @@ function App() {
           setNotificationStatus('granted');
         } else {
           setNotificationStatus('denied');
-          alert("❌ Notification permission denied. Please enable notifications in your browser settings.");
           return;
         }
       }
 
-      console.log(`⏰ Reminder set for ${formatTimezoneTime(scheduleTime, timezone)} (in ${Math.round(delay / 1000)} seconds)`);
+      const now = new Date();
       
-      const timeout = setTimeout(() => {
-        try {
-          // Create notification
-          const notification = new Notification("⏰ LinkedIn Post Reminder", {
-            body: `Time to post your content on LinkedIn!\n${formatTimezoneTime(scheduleTime, timezone)}`,
-            icon: "/favicon.ico",
-            tag: "linkedin-reminder",
-            requireInteraction: true,
-            silent: false
-          });
+      posts.forEach((post) => {
+        if (!post.scheduleTime) return;
+        
+        const target = new Date(post.scheduleTime);
+        const delay = target.getTime() - now.getTime();
+        
+        if (delay <= 0) return;
+        
+        console.log(`⏰ Reminder set for "${post.title}" at ${formatTimezoneTime(post.scheduleTime, post.timezone)} (in ${Math.round(delay / 1000)} seconds)`);
+        
+        const timeout = setTimeout(() => {
+          try {
+            // Create notification
+            const notification = new Notification(`⏰ LinkedIn Post Reminder: ${post.title}`, {
+              body: `Time to post "${post.title}" on LinkedIn!\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`,
+              icon: "/favicon.ico",
+              tag: `linkedin-reminder-${post.id}`,
+              requireInteraction: true,
+              silent: false
+            });
 
-          // Also show browser alert as fallback
-          alert(`⏰ REMINDER: Time to post your content on LinkedIn!\n\n${formatTimezoneTime(scheduleTime, timezone)}`);
+            // Also show browser alert as fallback
+            alert(`⏰ REMINDER: Time to post "${post.title}" on LinkedIn!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}\n\nClick on "📝 Posts" to switch to this post.`);
 
-          // Auto-close notification after 10 seconds
-          setTimeout(() => notification.close(), 10000);
-          
-          console.log("✅ Notification triggered successfully");
-        } catch (error) {
-          console.error("❌ Notification error:", error);
-          alert(`⏰ REMINDER: Time to post your content on LinkedIn!\n\n${formatTimezoneTime(scheduleTime, timezone)}`);
-        }
-        setNotificationScheduled(false);
-      }, delay);
-
-      setNotificationScheduled(true);
-      return () => clearTimeout(timeout);
+            // Auto-close notification after 15 seconds
+            setTimeout(() => notification.close(), 15000);
+            
+            console.log(`✅ Notification triggered for "${post.title}"`);
+          } catch (error) {
+            console.error("❌ Notification error:", error);
+            alert(`⏰ REMINDER: Time to post "${post.title}" on LinkedIn!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`);
+          }
+        }, delay);
+        
+        timeouts.push(timeout);
+      });
     };
 
-    setupNotification();
-  }, [scheduleTime, notificationScheduled, timezone]);
+    setupNotifications();
+    
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [posts]);
 
   return (
     <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} min-h-screen p-6`}>
       <div className={`max-w-4xl mx-auto p-6 rounded-2xl shadow-lg ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">LinkedIn Post Formatter</h1>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}
-          >
-            {darkMode ? "🌞 Light Mode" : "🌙 Dark Mode"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowPostManager(!showPostManager)}
+              className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+            >
+              📝 Posts ({posts.length})
+            </button>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}
+            >
+              {darkMode ? "🌞 Light Mode" : "🌙 Dark Mode"}
+            </button>
+          </div>
         </div>
+
+        {showPostManager && (
+          <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
+              <button
+                onClick={createNewPost}
+                className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+              >
+                ➕ New Post
+              </button>
+            </div>
+            
+            {posts.length === 0 ? (
+              <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                No posts yet. Click "New Post" to create your first post.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {posts.map((post) => (
+                  <div
+                    key={post.id}
+                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                      currentPostId === post.id 
+                        ? (darkMode ? "bg-blue-800 border-blue-600" : "bg-blue-100 border-blue-400")
+                        : (darkMode ? "bg-gray-800 border-gray-600 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-gray-50")
+                    }`}
+                    onClick={() => switchToPost(post.id)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={post.title}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            updatePostTitle(post.id, e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`font-medium text-sm bg-transparent border-none outline-none w-full hover:bg-opacity-50 hover:bg-gray-300 rounded px-1 -mx-1 transition-colors ${darkMode ? "text-white hover:bg-gray-600" : "text-gray-800 hover:bg-gray-100"}`}
+                          placeholder="📝 Click to edit title..."
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {post.content ? `${post.content.substring(0, 60)}${post.content.length > 60 ? '...' : ''}` : 'No content'}
+                        </p>
+                        {post.scheduleTime && (
+                          <p className={`text-xs mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                            📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 ml-3">
+                        {currentPostId === post.id && (
+                          <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}`}>
+                            ✏️ Active
+                          </span>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete "${post.title}"?`)) {
+                              deletePost(post.id);
+                            }
+                          }}
+                          className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {currentPostId && (
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={saveCurrentPost}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+                >
+                  💾 Save Current
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-2 mb-2">
           <button onClick={() => applyMarkdown("**")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Bold</button>
           <button onClick={() => applyMarkdown("_")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Italic</button>
+          <button 
+            onClick={saveToDraft}
+            className={`px-3 py-1 rounded-xl text-sm ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+          >
+            💾 Save to Draft
+          </button>
           <div className="relative emoji-picker-container">
             <button 
               onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
