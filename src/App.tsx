@@ -1009,6 +1009,13 @@ function App() {
               📝 Posts ({posts.length})
             </button>
             <button
+              onClick={() => window.open('https://github.com/terrytangyuan/social-media-kit', '_blank')}
+              className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "bg-yellow-500 hover:bg-yellow-600 text-white"}`}
+              title="Star this project on GitHub!"
+            >
+              ⭐ GitHub
+            </button>
+            <button
               onClick={() => setShowOAuthSettings(!showOAuthSettings)}
               className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
             >
@@ -1693,6 +1700,36 @@ function App() {
             </div>
           </div>
         )}
+        
+        {/* Footer */}
+        <div className={`mt-8 pt-6 border-t text-center ${darkMode ? "border-gray-700 text-gray-400" : "border-gray-200 text-gray-600"}`}>
+          <div className="space-y-3">
+            <div className="flex justify-center items-center gap-2">
+              <span className="text-sm">Made with ❤️ for the community</span>
+            </div>
+            <div className="flex justify-center items-center gap-4">
+              <a 
+                href="https://github.com/terrytangyuan/social-media-kit" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={`text-sm px-3 py-1 rounded-lg transition-colors ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-800"}`}
+              >
+                ⭐ Star on GitHub
+              </a>
+              <a 
+                href="https://github.com/terrytangyuan/social-media-kit/issues" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={`text-sm px-3 py-1 rounded-lg transition-colors ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-800"}`}
+              >
+                🐛 Report Issues
+              </a>
+            </div>
+            <p className="text-xs">
+              Find this tool helpful? Give it a star to support the project! 🌟
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
