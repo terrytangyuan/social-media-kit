@@ -312,6 +312,79 @@ function App() {
     ));
   };
 
+  const savePostsToDisk = () => {
+    const dataToSave = {
+      posts: posts,
+      exportedAt: new Date().toISOString(),
+      appVersion: "1.0.0"
+    };
+    
+    const dataStr = JSON.stringify(dataToSave, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `linkedin-posts-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+
+  const loadPostsFromDisk = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.onchange = (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const data = JSON.parse(content);
+          
+          // Validate the data structure
+          if (!data.posts || !Array.isArray(data.posts)) {
+            alert('❌ Invalid file format. Please select a valid posts backup file.');
+            return;
+          }
+          
+          // Validate each post has required fields
+          const validPosts = data.posts.filter((post: any) => 
+            post.id && post.title !== undefined && post.content !== undefined
+          );
+          
+          if (validPosts.length === 0) {
+            alert('❌ No valid posts found in the file.');
+            return;
+          }
+          
+          // Load the posts
+          setPosts(validPosts);
+          
+          // If there are posts, switch to the first one
+          if (validPosts.length > 0) {
+            const firstPost = validPosts[0];
+            setCurrentPostId(firstPost.id);
+            setText(firstPost.content);
+            setScheduleTime(firstPost.scheduleTime || getCurrentDateTimeString());
+            setTimezone(firstPost.timezone || timezone);
+          }
+          
+          alert(`✅ Successfully loaded ${validPosts.length} posts!`);
+        } catch (error) {
+          console.error('Error parsing file:', error);
+          alert('❌ Error reading file. Please make sure it\'s a valid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    };
+    
+    fileInput.click();
+  };
+
   const emojiCategories = {
     "Smileys & People": ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕"],
     "Animals & Nature": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊️", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿️"],
@@ -485,12 +558,28 @@ function App() {
           <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
-              <button
-                onClick={createNewPost}
-                className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
-              >
-                ➕ New Post
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={loadPostsFromDisk}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                  title="Load posts from file"
+                >
+                  📁 Load
+                </button>
+                <button
+                  onClick={savePostsToDisk}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
+                  title="Save posts to file"
+                >
+                  💾 Save
+                </button>
+                <button
+                  onClick={createNewPost}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+                >
+                  ➕ New Post
+                </button>
+              </div>
             </div>
             
             {posts.length === 0 ? (
