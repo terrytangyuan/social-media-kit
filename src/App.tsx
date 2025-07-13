@@ -663,10 +663,21 @@ function App() {
     return response.json();
   };
 
-  const postToTwitter = async (content: string) => {
+  const postToTwitter = async (content: string, replyToTweetId?: string) => {
     const authData = auth.twitter;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Twitter');
+    }
+    
+    const tweetData: any = {
+      text: content
+    };
+    
+    // Add reply field if this is a reply to another tweet
+    if (replyToTweetId) {
+      tweetData.reply = {
+        in_reply_to_tweet_id: replyToTweetId
+      };
     }
     
     const response = await fetch('https://api.twitter.com/2/tweets', {
@@ -675,9 +686,7 @@ function App() {
         'Authorization': `Bearer ${authData.accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        text: content
-      })
+      body: JSON.stringify(tweetData)
     });
     
     if (!response.ok) {
@@ -687,10 +696,29 @@ function App() {
     return response.json();
   };
 
-  const postToBluesky = async (content: string) => {
+  const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string) => {
     const authData = auth.bluesky;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Bluesky');
+    }
+    
+    const record: any = {
+      text: content,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Add reply field if this is a reply to another post
+    if (replyToUri && replyToCid) {
+      record.reply = {
+        root: {
+          uri: replyToUri,
+          cid: replyToCid
+        },
+        parent: {
+          uri: replyToUri,
+          cid: replyToCid
+        }
+      };
     }
     
     const response = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
@@ -702,10 +730,7 @@ function App() {
       body: JSON.stringify({
         repo: authData.userInfo.did,
         collection: 'app.bsky.feed.post',
-        record: {
-          text: content,
-          createdAt: new Date().toISOString()
-        }
+        record: record
       })
     });
     
@@ -733,6 +758,10 @@ function App() {
       
       let results = [];
       
+      let previousPostId: string | undefined;
+      let previousPostUri: string | undefined;
+      let previousPostCid: string | undefined;
+      
       for (let i = 0; i < formattedChunks.length; i++) {
         const chunk = formattedChunks[i];
         setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${selectedPlatform}...`);
@@ -743,10 +772,19 @@ function App() {
             result = await postToLinkedIn(chunk);
             break;
           case 'twitter':
-            result = await postToTwitter(chunk);
+            result = await postToTwitter(chunk, previousPostId);
+            // Extract tweet ID for next reply
+            if (result?.data?.id) {
+              previousPostId = result.data.id;
+            }
             break;
           case 'bluesky':
-            result = await postToBluesky(chunk);
+            result = await postToBluesky(chunk, previousPostUri, previousPostCid);
+            // Extract URI and CID for next reply
+            if (result?.uri && result?.cid) {
+              previousPostUri = result.uri;
+              previousPostCid = result.cid;
+            }
             break;
           default:
             throw new Error(`Unsupported platform: ${selectedPlatform}`);
@@ -808,19 +846,33 @@ function App() {
           const chunks = chunkText(text, platform);
           const formattedChunks = chunks.map(chunk => formatForPlatform(chunk, platform));
           
+          let previousPostId: string | undefined;
+          let previousPostUri: string | undefined;
+          let previousPostCid: string | undefined;
+          
           for (let i = 0; i < formattedChunks.length; i++) {
             const chunk = formattedChunks[i];
             setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${platformNames[platform]}...`);
             
+            let result;
             switch (platform) {
               case 'linkedin':
-                await postToLinkedIn(chunk);
+                result = await postToLinkedIn(chunk);
                 break;
               case 'twitter':
-                await postToTwitter(chunk);
+                result = await postToTwitter(chunk, previousPostId);
+                // Extract tweet ID for next reply
+                if (result?.data?.id) {
+                  previousPostId = result.data.id;
+                }
                 break;
               case 'bluesky':
-                await postToBluesky(chunk);
+                result = await postToBluesky(chunk, previousPostUri, previousPostCid);
+                // Extract URI and CID for next reply
+                if (result?.uri && result?.cid) {
+                  previousPostUri = result.uri;
+                  previousPostCid = result.cid;
+                }
                 break;
             }
             
@@ -1650,7 +1702,11 @@ function App() {
                 <div className="space-y-4">
                   {chunks.length > 1 && (
                     <div className={`text-sm p-2 rounded-lg ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
-                      📱 This post will be split into {chunks.length} parts due to character limit ({PLATFORM_LIMITS[selectedPlatform]} chars)
+                      {selectedPlatform === 'linkedin' ? (
+                        <>📱 This post will be split into {chunks.length} parts due to character limit ({PLATFORM_LIMITS[selectedPlatform]} chars)</>
+                      ) : (
+                        <>🧵 This post will create a thread with {chunks.length} parts due to character limit ({PLATFORM_LIMITS[selectedPlatform]} chars)</>
+                      )}
                     </div>
                   )}
                   {formattedChunks.map((chunk, index) => (
