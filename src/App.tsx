@@ -1509,34 +1509,7 @@ function App() {
               📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
             </button>
           )}
-          <button 
-            onClick={() => {
-              const chunks = chunkText(text, selectedPlatform);
-              const formattedChunks = chunks.map((chunk) => {
-                return formatForPlatform(chunk, selectedPlatform);
-              });
-              const finalText = formattedChunks.join('\n\n---\n\n');
-              
-              const tempDiv = document.createElement('div');
-              tempDiv.textContent = finalText;
-              tempDiv.style.position = 'absolute';
-              tempDiv.style.left = '-9999px';
-              document.body.appendChild(tempDiv);
-              
-              const selection = window.getSelection();
-              const range = document.createRange();
-              range.selectNodeContents(tempDiv);
-              selection?.removeAllRanges();
-              selection?.addRange(range);
-              
-              setTimeout(() => {
-                document.body.removeChild(tempDiv);
-              }, 1000);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl"
-          >
-            🖱️ Select All Text
-          </button>
+
         </div>
 
 
