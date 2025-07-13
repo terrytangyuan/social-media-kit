@@ -4,9 +4,6 @@ A comprehensive social media management tool designed to help you create, format
 
 ⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
-
-## 📸 Screenshots
-
 <div align="center">
   <img src="screenshots/main-interface.png" alt="Social Media Kit Main Interface" width="800"/>
 </div>
