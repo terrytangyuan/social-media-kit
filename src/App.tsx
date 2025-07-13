@@ -2,6 +2,61 @@ import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
+// OAuth configuration type
+type OAuthConfig = {
+  linkedin: {
+    clientId: string;
+    redirectUri: string;
+    scope: string;
+    authUrl: string;
+  };
+  twitter: {
+    clientId: string;
+    redirectUri: string;
+    scope: string;
+    authUrl: string;
+  };
+  bluesky: {
+    server: string;
+  };
+};
+
+// Default OAuth configuration
+const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
+  linkedin: {
+    clientId: '',
+    redirectUri: window.location.origin + '/auth/linkedin',
+    scope: 'w_member_social',
+    authUrl: 'https://www.linkedin.com/oauth/v2/authorization'
+  },
+  twitter: {
+    clientId: '',
+    redirectUri: window.location.origin + '/auth/twitter',
+    scope: 'tweet.read tweet.write users.read',
+    authUrl: 'https://twitter.com/i/oauth2/authorize'
+  },
+  bluesky: {
+    server: 'https://bsky.social'
+  }
+};
+
+type AuthState = {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+  userInfo: any;
+};
+
+type PlatformAuth = {
+  linkedin: AuthState;
+  twitter: AuthState;
+  bluesky: AuthState & {
+    handle: string;
+    appPassword: string;
+  };
+};
+
 function App() {
   const [text, setText] = useState("");
   const [darkMode, setDarkMode] = useState(false);
@@ -33,6 +88,46 @@ function App() {
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [showPostManager, setShowPostManager] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'bluesky'>('linkedin');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authPlatform, setAuthPlatform] = useState<'linkedin' | 'twitter' | 'bluesky' | null>(null);
+  const [blueskyCredentials, setBlueskyCredentials] = useState({
+    handle: '',
+    appPassword: ''
+  });
+  const [isPosting, setIsPosting] = useState(false);
+  const [postingStatus, setPostingStatus] = useState<string>('');
+  
+  // OAuth configuration state
+  const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
+  const [showOAuthSettings, setShowOAuthSettings] = useState(false);
+  
+  // Authentication state
+  const [auth, setAuth] = useState<PlatformAuth>({
+    linkedin: {
+      isAuthenticated: false,
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      userInfo: null
+    },
+    twitter: {
+      isAuthenticated: false,
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      userInfo: null
+    },
+    bluesky: {
+      isAuthenticated: false,
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      userInfo: null,
+      handle: '',
+      appPassword: ''
+    }
+  });
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const PLATFORM_LIMITS = {
@@ -47,6 +142,8 @@ function App() {
     const schedule = localStorage.getItem("scheduleTime");
     const savedTimezone = localStorage.getItem("timezone");
     const savedPosts = localStorage.getItem("linkedinPosts");
+    const savedAuth = localStorage.getItem("platformAuth");
+    const savedOAuthConfig = localStorage.getItem("oauthConfig");
     
     if (savedPosts) {
       const parsedPosts = JSON.parse(savedPosts);
@@ -58,6 +155,24 @@ function App() {
         setText(firstPost.content);
         setScheduleTime(firstPost.scheduleTime);
         setTimezone(firstPost.timezone);
+      }
+    }
+    
+    if (savedAuth) {
+      try {
+        const parsedAuth = JSON.parse(savedAuth);
+        setAuth(parsedAuth);
+      } catch (error) {
+        console.error('Error parsing saved auth:', error);
+      }
+    }
+    
+    if (savedOAuthConfig) {
+      try {
+        const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
+        setOauthConfig(parsedOAuthConfig);
+      } catch (error) {
+        console.error('Error parsing saved OAuth config:', error);
       }
     }
     
@@ -86,6 +201,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem("linkedinPosts", JSON.stringify(posts));
   }, [posts]);
+
+  useEffect(() => {
+    localStorage.setItem("platformAuth", JSON.stringify(auth));
+  }, [auth]);
+
+  useEffect(() => {
+    localStorage.setItem("oauthConfig", JSON.stringify(oauthConfig));
+  }, [oauthConfig]);
 
   useEffect(() => {
     // Check notification status on mount
@@ -392,6 +515,266 @@ function App() {
     fileInput.click();
   };
 
+  // OAuth configuration functions
+  const updateOAuthConfig = (platform: 'linkedin' | 'twitter', clientId: string) => {
+    setOauthConfig(prev => ({
+      ...prev,
+      [platform]: {
+        ...prev[platform],
+        clientId
+      }
+    }));
+  };
+
+  const updateBlueskyConfig = (server: string) => {
+    setOauthConfig(prev => ({
+      ...prev,
+      bluesky: {
+        server
+      }
+    }));
+  };
+
+  // Authentication functions
+  const initiateOAuth = (platform: 'linkedin' | 'twitter') => {
+    const config = oauthConfig[platform];
+    
+    // Check if client ID is properly configured
+    if (!config.clientId || config.clientId === '') {
+      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save the settings\n\nSee AUTHENTICATION_SETUP.md for detailed instructions.`);
+      return;
+    }
+    
+    const state = Math.random().toString(36).substring(2, 15);
+    localStorage.setItem(`oauth_state_${platform}`, state);
+    
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: config.clientId,
+      redirect_uri: config.redirectUri,
+      scope: config.scope,
+      state: state
+    });
+    
+    window.location.href = `${config.authUrl}?${params.toString()}`;
+  };
+
+  const authenticateBluesky = async (handle: string, appPassword: string) => {
+    try {
+      setIsPosting(true);
+      setPostingStatus('Authenticating with Bluesky...');
+      
+      const response = await fetch('https://bsky.social/xrpc/com.atproto.server.createSession', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          identifier: handle,
+          password: appPassword
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Authentication failed');
+      }
+      
+      const data = await response.json();
+      
+      setAuth(prev => ({
+        ...prev,
+        bluesky: {
+          ...prev.bluesky,
+          isAuthenticated: true,
+          accessToken: data.accessJwt,
+          refreshToken: data.refreshJwt,
+          expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+          userInfo: data,
+          handle: handle,
+          appPassword: appPassword
+        }
+      }));
+      
+      setShowAuthModal(false);
+      setPostingStatus('');
+      alert('✅ Successfully authenticated with Bluesky!');
+    } catch (error) {
+      console.error('Bluesky auth error:', error);
+      alert('❌ Failed to authenticate with Bluesky. Please check your credentials.');
+      setPostingStatus('');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const logout = (platform: 'linkedin' | 'twitter' | 'bluesky') => {
+    setAuth(prev => ({
+      ...prev,
+      [platform]: {
+        ...prev[platform],
+        isAuthenticated: false,
+        accessToken: null,
+        refreshToken: null,
+        expiresAt: null,
+        userInfo: null,
+        ...(platform === 'bluesky' && { handle: '', appPassword: '' })
+      }
+    }));
+    
+    localStorage.removeItem(`oauth_state_${platform}`);
+    alert(`✅ Logged out from ${platform}`);
+  };
+
+  // Posting functions
+  const postToLinkedIn = async (content: string) => {
+    const authData = auth.linkedin;
+    if (!authData.isAuthenticated || !authData.accessToken) {
+      throw new Error('Not authenticated with LinkedIn');
+    }
+    
+    const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authData.accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0'
+      },
+      body: JSON.stringify({
+        author: `urn:li:person:${authData.userInfo.id}`,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text: content
+            },
+            shareMediaCategory: 'NONE'
+          }
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`LinkedIn API error: ${response.statusText}`);
+    }
+    
+    return response.json();
+  };
+
+  const postToTwitter = async (content: string) => {
+    const authData = auth.twitter;
+    if (!authData.isAuthenticated || !authData.accessToken) {
+      throw new Error('Not authenticated with Twitter');
+    }
+    
+    const response = await fetch('https://api.twitter.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authData.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        text: content
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Twitter API error: ${response.statusText}`);
+    }
+    
+    return response.json();
+  };
+
+  const postToBluesky = async (content: string) => {
+    const authData = auth.bluesky;
+    if (!authData.isAuthenticated || !authData.accessToken) {
+      throw new Error('Not authenticated with Bluesky');
+    }
+    
+    const response = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authData.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        repo: authData.userInfo.did,
+        collection: 'app.bsky.feed.post',
+        record: {
+          text: content,
+          createdAt: new Date().toISOString()
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Bluesky API error: ${response.statusText}`);
+    }
+    
+    return response.json();
+  };
+
+  const handleAutoPost = async () => {
+    const authData = auth[selectedPlatform];
+    if (!authData.isAuthenticated) {
+      setAuthPlatform(selectedPlatform);
+      setShowAuthModal(true);
+      return;
+    }
+    
+    try {
+      setIsPosting(true);
+      setPostingStatus(`Posting to ${selectedPlatform}...`);
+      
+      const chunks = chunkText(text, selectedPlatform);
+      const formattedChunks = chunks.map(chunk => formatForPlatform(chunk, selectedPlatform));
+      
+      let results = [];
+      
+      for (let i = 0; i < formattedChunks.length; i++) {
+        const chunk = formattedChunks[i];
+        setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${selectedPlatform}...`);
+        
+        let result;
+        switch (selectedPlatform) {
+          case 'linkedin':
+            result = await postToLinkedIn(chunk);
+            break;
+          case 'twitter':
+            result = await postToTwitter(chunk);
+            break;
+          case 'bluesky':
+            result = await postToBluesky(chunk);
+            break;
+          default:
+            throw new Error(`Unsupported platform: ${selectedPlatform}`);
+        }
+        
+        results.push(result);
+        
+        // Add delay between posts for multi-part content
+        if (i < formattedChunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      setPostingStatus('');
+      alert(`✅ Successfully posted to ${selectedPlatform}!`);
+      
+      // Clear the text after successful posting
+      setText('');
+      
+    } catch (error) {
+      console.error('Posting error:', error);
+      alert(`❌ Failed to post to ${selectedPlatform}: ${error}`);
+      setPostingStatus('');
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
   const emojiCategories = {
     "Smileys & People": ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕"],
     "Animals & Nature": ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷️", "🕸️", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊️", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿️"],
@@ -626,6 +1009,12 @@ function App() {
               📝 Posts ({posts.length})
             </button>
             <button
+              onClick={() => setShowOAuthSettings(!showOAuthSettings)}
+              className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
+            >
+              ⚙️ Settings
+            </button>
+            <button
               onClick={() => setDarkMode(!darkMode)}
               className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}
             >
@@ -633,6 +1022,143 @@ function App() {
             </button>
           </div>
         </div>
+
+        {showOAuthSettings && (
+          <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">⚙️ OAuth Settings</h2>
+              <button
+                onClick={() => setShowOAuthSettings(false)}
+                className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-gray-600 hover:bg-gray-500 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-700"}`}
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                <h3 className="font-semibold mb-3">💼 LinkedIn</h3>
+                <div className="space-y-3">
+                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                    <ol className="text-xs space-y-1">
+                      <li>1. Go to <a href="https://www.linkedin.com/developers/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">LinkedIn Developer Portal</a></li>
+                      <li>2. Create a new app or select existing one</li>
+                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173/auth/linkedin</code></li>
+                      <li>4. Enable scope: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>w_member_social</code></li>
+                      <li>5. Copy the Client ID and paste it below</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                      Client ID
+                    </label>
+                    <input
+                      type="text"
+                      value={oauthConfig.linkedin.clientId}
+                      onChange={(e) => updateOAuthConfig('linkedin', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      placeholder="86abc123def456789"
+                    />
+                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      {oauthConfig.linkedin.clientId ? '✅ LinkedIn Client ID configured' : '⚠️ Client ID required for LinkedIn posting'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                <h3 className="font-semibold mb-3">🐦 X/Twitter</h3>
+                <div className="space-y-3">
+                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                    <ol className="text-xs space-y-1">
+                      <li>1. Go to <a href="https://developer.twitter.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Twitter Developer Portal</a></li>
+                      <li>2. Create a new app or select existing one</li>
+                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173/auth/twitter</code></li>
+                      <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
+                      <li>5. Copy the Client ID and paste it below</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                      Client ID
+                    </label>
+                    <input
+                      type="text"
+                      value={oauthConfig.twitter.clientId}
+                      onChange={(e) => updateOAuthConfig('twitter', e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      placeholder="TwItTeRcLiEnTiD123456789"
+                    />
+                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured' : '⚠️ Client ID required for Twitter posting'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                <h3 className="font-semibold mb-3">🦋 Bluesky</h3>
+                <div className="space-y-3">
+                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                    <ol className="text-xs space-y-1">
+                      <li>1. Log into your Bluesky account</li>
+                      <li>2. Go to Settings → Privacy and Security → App Passwords</li>
+                      <li>3. Click "Add App Password" and name it (e.g., "LinkedIn Post Formatter")</li>
+                      <li>4. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)</li>
+                      <li>5. When logging in, use your handle and the app password</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                      Server URL
+                    </label>
+                    <input
+                      type="text"
+                      value={oauthConfig.bluesky.server}
+                      onChange={(e) => updateBlueskyConfig(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      placeholder="https://bsky.social"
+                    />
+                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      💡 Usually https://bsky.social unless using a custom server
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 space-y-3">
+              <div className={`p-3 rounded-md ${darkMode ? "bg-green-900 text-green-100" : "bg-green-50 text-green-800"}`}>
+                <h4 className="font-medium text-sm mb-2">🚀 Next Steps:</h4>
+                <ol className="text-xs space-y-1">
+                  <li>1. Configure your Client IDs above</li>
+                  <li>2. Close this settings panel</li>
+                  <li>3. Select a platform and click "Login"</li>
+                  <li>4. Complete the OAuth flow</li>
+                  <li>5. Start posting with the "Post to [Platform]" button!</li>
+                </ol>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  💡 Settings are automatically saved
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm('Reset all OAuth settings to default?')) {
+                      setOauthConfig(DEFAULT_OAUTH_CONFIG);
+                    }
+                  }}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                >
+                  🔄 Reset to Default
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showPostManager && (
           <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
@@ -822,8 +1348,39 @@ function App() {
                 }`}
               >
                 {platform.icon} {platform.label}
+                {auth[platform.key].isAuthenticated && (
+                  <span className="ml-1 text-green-400">✓</span>
+                )}
               </button>
             ))}
+          </div>
+          
+          {/* Authentication Status */}
+          <div className={`text-sm mb-3 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+            {auth[selectedPlatform].isAuthenticated ? (
+              <div className="flex items-center justify-between">
+                <span className="text-green-500">✅ Connected to {selectedPlatform}</span>
+                <button
+                  onClick={() => logout(selectedPlatform)}
+                  className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span>Not connected to {selectedPlatform}</span>
+                <button
+                  onClick={() => {
+                    setAuthPlatform(selectedPlatform);
+                    setShowAuthModal(true);
+                  }}
+                  className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                >
+                  Login
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -921,10 +1478,30 @@ function App() {
           </div>
         </div>
 
+        {/* Posting Status */}
+        {postingStatus && (
+          <div className={`mb-4 p-3 rounded-lg ${darkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}>
+            <div className="flex items-center gap-2">
+              <span className="animate-spin">⏳</span>
+              <span>{postingStatus}</span>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-4">
-          <button onClick={handleCopyStyled} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">
-            📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
-          </button>
+          {auth[selectedPlatform].isAuthenticated ? (
+            <button 
+              onClick={handleAutoPost}
+              disabled={isPosting}
+              className={`${isPosting ? 'bg-gray-500' : 'bg-green-600 hover:bg-green-700'} text-white px-4 py-2 rounded-xl flex items-center gap-2`}
+            >
+              {isPosting ? '⏳' : '📤'} {isPosting ? 'Posting...' : `Post to ${selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}`}
+            </button>
+          ) : (
+            <button onClick={handleCopyStyled} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">
+              📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
+            </button>
+          )}
           <button 
             onClick={() => {
               const chunks = chunkText(text, selectedPlatform);
@@ -1021,6 +1598,99 @@ function App() {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* Authentication Modal */}
+        {showAuthModal && authPlatform && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className={`max-w-md w-full mx-4 p-6 rounded-xl shadow-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">
+                  Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : authPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
+                </h2>
+                <button
+                  onClick={() => setShowAuthModal(false)}
+                  className={`text-gray-500 hover:text-gray-700 ${darkMode ? "hover:text-gray-300" : ""}`}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              {authPlatform === 'bluesky' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                      Handle (e.g., username.bsky.social)
+                    </label>
+                    <input
+                      type="text"
+                      value={blueskyCredentials.handle}
+                      onChange={(e) => setBlueskyCredentials(prev => ({ ...prev, handle: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      placeholder="your-handle.bsky.social"
+                      disabled={isPosting}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                      App Password
+                    </label>
+                    <input
+                      type="password"
+                      value={blueskyCredentials.appPassword}
+                      onChange={(e) => setBlueskyCredentials(prev => ({ ...prev, appPassword: e.target.value }))}
+                      className={`w-full px-3 py-2 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      placeholder="xxxx-xxxx-xxxx-xxxx"
+                      disabled={isPosting}
+                    />
+                  </div>
+                  <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    <p>You can generate an app password in your Bluesky settings under "App Passwords".</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => authenticateBluesky(blueskyCredentials.handle, blueskyCredentials.appPassword)}
+                      disabled={isPosting || !blueskyCredentials.handle || !blueskyCredentials.appPassword}
+                      className={`flex-1 px-4 py-2 rounded-lg text-white ${
+                        isPosting || !blueskyCredentials.handle || !blueskyCredentials.appPassword
+                          ? 'bg-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {isPosting ? 'Authenticating...' : 'Connect'}
+                    </button>
+                    <button
+                      onClick={() => setShowAuthModal(false)}
+                      disabled={isPosting}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-800"}`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                    You will be redirected to {authPlatform === 'linkedin' ? 'LinkedIn' : 'X/Twitter'} to authorize this application.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => initiateOAuth(authPlatform as 'linkedin' | 'twitter')}
+                      className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                    >
+                      Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : 'X/Twitter'}
+                    </button>
+                    <button
+                      onClick={() => setShowAuthModal(false)}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-800"}`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
