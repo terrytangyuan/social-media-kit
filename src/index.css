@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Ensure textarea placeholder text is properly styled */
+textarea::placeholder {
+  opacity: 1;
+}
+
+/* Dark mode textarea styling */
+.dark-textarea::placeholder {
+  color: #9ca3af; /* gray-400 */
+}
+
+.light-textarea::placeholder {
+  color: #6b7280; /* gray-500 */
+}
