@@ -2,15 +2,7 @@
 
 A comprehensive social media management tool designed to help you create, format, and post content across multiple platforms including LinkedIn, Twitter/X, and Bluesky. Features advanced styling, emoji support, OAuth authentication, and cross-platform posting capabilities.
 
-## ⭐ GitHub Repository
-
-**[🌟 Star this project on GitHub!](https://github.com/terrytangyuan/social-media-kit)** ⭐
-
-Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
-
-[![GitHub stars](https://img.shields.io/github/stars/terrytangyuan/social-media-kit?style=social)](https://github.com/terrytangyuan/social-media-kit)
-[![GitHub forks](https://img.shields.io/github/forks/terrytangyuan/social-media-kit?style=social)](https://github.com/terrytangyuan/social-media-kit)
-[![GitHub issues](https://img.shields.io/github/issues/terrytangyuan/social-media-kit)](https://github.com/terrytangyuan/social-media-kit/issues)
+⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
 ## 🚀 Features
 
