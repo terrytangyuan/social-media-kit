@@ -1011,28 +1011,27 @@ function App() {
       throw new Error('Not authenticated with Twitter');
     }
     
-    const tweetData: any = {
-      text: content
+    const requestBody: any = {
+      content,
+      accessToken: authData.accessToken
     };
     
     // Add reply field if this is a reply to another tweet
     if (replyToTweetId) {
-      tweetData.reply = {
-        in_reply_to_tweet_id: replyToTweetId
-      };
+      requestBody.replyToTweetId = replyToTweetId;
     }
     
-    const response = await fetch('https://api.twitter.com/2/tweets', {
+    const response = await fetch('/api/twitter/post', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${authData.accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(tweetData)
+      body: JSON.stringify(requestBody)
     });
     
     if (!response.ok) {
-      throw new Error(`Twitter API error: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Twitter API error: ${errorData.error || response.statusText}`);
     }
     
     return response.json();

@@ -321,6 +321,62 @@ app.post('/api/linkedin/post', async (req, res) => {
   }
 });
 
+// Twitter posting endpoint
+app.post('/api/twitter/post', async (req, res) => {
+  try {
+    const { content, accessToken, replyToTweetId } = req.body;
+    
+    if (!content || !accessToken) {
+      return res.status(400).json({ error: 'Content and access token are required' });
+    }
+    
+    console.log('📤 Posting to Twitter via server...');
+    
+    const tweetData = {
+      text: content
+    };
+    
+    // Add reply field if this is a reply to another tweet
+    if (replyToTweetId) {
+      tweetData.reply = {
+        in_reply_to_tweet_id: replyToTweetId
+      };
+    }
+    
+    const response = await fetch('https://api.twitter.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(tweetData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ Twitter API error:', response.status, response.statusText, errorData);
+      return res.status(response.status).json({ 
+        error: 'Twitter API error', 
+        details: errorData,
+        status: response.status,
+        statusText: response.statusText
+      });
+    }
+    
+    const result = await response.json();
+    console.log('✅ Twitter post successful:', result);
+    
+    res.json({ success: true, data: result });
+    
+  } catch (error) {
+    console.error('❌ Twitter posting error:', error);
+    res.status(500).json({ 
+      error: 'Twitter posting failed', 
+      details: error.message 
+    });
+  }
+});
+
 // Serve the frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
