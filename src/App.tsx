@@ -25,13 +25,13 @@ type OAuthConfig = {
 const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
   linkedin: {
     clientId: '',
-    redirectUri: window.location.origin + '/auth/linkedin',
+    redirectUri: window.location.origin,
     scope: 'w_member_social',
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization'
   },
   twitter: {
     clientId: '',
-    redirectUri: window.location.origin + '/auth/twitter',
+    redirectUri: window.location.origin,
     scope: 'tweet.read tweet.write users.read',
     authUrl: 'https://twitter.com/i/oauth2/authorize'
   },
@@ -228,6 +228,58 @@ function App() {
     };
 
     checkNotificationStatus();
+    
+    // Handle OAuth callback
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
+      
+      if (error) {
+        alert(`❌ OAuth Error: ${error}\n${urlParams.get('error_description') || 'Authentication failed'}`);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+      
+      if (code && state) {
+        // Determine platform from URL path or state
+        let platform: 'linkedin' | 'twitter' | null = null;
+        if (window.location.pathname.includes('/auth/linkedin')) {
+          platform = 'linkedin';
+        } else if (window.location.pathname.includes('/auth/twitter')) {
+          platform = 'twitter';
+        } else {
+          // Fallback: check stored state
+          const linkedinState = localStorage.getItem('oauth_state_linkedin');
+          const twitterState = localStorage.getItem('oauth_state_twitter');
+          if (state === linkedinState) platform = 'linkedin';
+          else if (state === twitterState) platform = 'twitter';
+        }
+        
+        if (platform) {
+          const storedState = localStorage.getItem(`oauth_state_${platform}`);
+          if (state === storedState) {
+            try {
+              await completeOAuthFlow(platform, code);
+            } catch (error) {
+              console.error('OAuth completion error:', error);
+              alert(`❌ Failed to complete ${platform} authentication: ${error}`);
+            }
+          } else {
+            alert('❌ OAuth Error: Invalid state parameter. Possible security issue.');
+          }
+          
+          // Clean up
+          localStorage.removeItem(`oauth_state_${platform}`);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+    
+    handleOAuthCallback();
   }, []);
 
   useEffect(() => {
@@ -533,6 +585,86 @@ function App() {
         server
       }
     }));
+  };
+
+  // OAuth completion function
+  const completeOAuthFlow = async (platform: 'linkedin' | 'twitter', code: string) => {
+    const config = oauthConfig[platform];
+    
+    try {
+      // Exchange authorization code for access token
+      const tokenResponse = await fetch('/api/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform,
+          code,
+          clientId: config.clientId,
+          redirectUri: config.redirectUri
+        })
+      });
+      
+      if (!tokenResponse.ok) {
+        // If API endpoint doesn't exist (development), show manual token instructions
+        throw new Error(`OAuth token exchange failed. You may need to implement a backend token exchange service or manually configure tokens.`);
+      }
+      
+      const tokenData = await tokenResponse.json();
+      
+      // Fetch user profile
+      let userInfo;
+      if (platform === 'linkedin') {
+        const profileResponse = await fetch('https://api.linkedin.com/v2/people/~', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          }
+        });
+        
+        if (!profileResponse.ok) {
+          throw new Error('Failed to fetch LinkedIn profile');
+        }
+        
+        userInfo = await profileResponse.json();
+      } else if (platform === 'twitter') {
+        const profileResponse = await fetch('https://api.twitter.com/2/users/me', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          }
+        });
+        
+        if (!profileResponse.ok) {
+          throw new Error('Failed to fetch Twitter profile');
+        }
+        
+        userInfo = await profileResponse.json();
+      }
+      
+      // Update authentication state
+      setAuth(prev => ({
+        ...prev,
+        [platform]: {
+          isAuthenticated: true,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || null,
+          expiresAt: tokenData.expires_in ? Date.now() + (tokenData.expires_in * 1000) : null,
+          userInfo: userInfo
+        }
+      }));
+      
+      alert(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}!`);
+      
+    } catch (error) {
+      console.error('OAuth completion error:', error);
+      
+      // For development - show manual instructions
+      if (error instanceof Error && error.message.includes('OAuth token exchange failed')) {
+        alert(`⚠️ ${platform.toUpperCase()} AUTHENTICATION INCOMPLETE\n\nThis app needs a backend service to complete OAuth. For development:\n\n1. The authorization was successful\n2. You need to manually exchange the code for a token\n3. Or implement a backend OAuth handler\n\nSee AUTHENTICATION_SETUP.md for details.`);
+      } else {
+        throw error;
+      }
+    }
   };
 
   // Authentication functions
@@ -1202,7 +1334,7 @@ function App() {
                     <ol className="text-xs space-y-1">
                       <li>1. Go to <a href="https://www.linkedin.com/developers/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">LinkedIn Developer Portal</a></li>
                       <li>2. Create a new app or select existing one</li>
-                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173/auth/linkedin</code></li>
+                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173</code></li>
                       <li>4. Enable scope: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>w_member_social</code></li>
                       <li>5. Copy the Client ID and paste it below</li>
                     </ol>
@@ -1233,7 +1365,7 @@ function App() {
                     <ol className="text-xs space-y-1">
                       <li>1. Go to <a href="https://developer.twitter.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Twitter Developer Portal</a></li>
                       <li>2. Create a new app or select existing one</li>
-                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173/auth/twitter</code></li>
+                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173</code></li>
                       <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
                       <li>5. Copy the Client ID and paste it below</li>
                     </ol>
