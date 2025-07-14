@@ -395,6 +395,10 @@ function App() {
           
           // Clean up
           localStorage.removeItem(`oauth_state_${platform}`);
+          // Clean up Twitter code verifier if this was a Twitter OAuth flow
+          if (platform === 'twitter') {
+            localStorage.removeItem('twitter_code_verifier');
+          }
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
         }
@@ -745,18 +749,34 @@ function App() {
         codeLength: code.length
       });
       
+      // Prepare request body
+      const requestBody: any = {
+        platform,
+        code,
+        clientId: config.clientId,
+        redirectUri: config.redirectUri
+      };
+      
+      // Add PKCE code verifier for Twitter
+      if (platform === 'twitter') {
+        const codeVerifier = localStorage.getItem('twitter_code_verifier');
+        if (!codeVerifier) {
+          throw new Error('Twitter code verifier not found. Please restart the authentication process.');
+        }
+        requestBody.codeVerifier = codeVerifier;
+        console.log('✅ Added PKCE code verifier for Twitter token exchange:', {
+          codeVerifier: codeVerifier.substring(0, 10) + '...',
+          length: codeVerifier.length
+        });
+      }
+      
       // Exchange authorization code for access token
       const tokenResponse = await fetch('/api/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          platform,
-          code,
-          clientId: config.clientId,
-          redirectUri: config.redirectUri
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!tokenResponse.ok) {
@@ -795,6 +815,12 @@ function App() {
       
       alert(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}!`);
       
+      // Clean up Twitter PKCE code verifier
+      if (platform === 'twitter') {
+        localStorage.removeItem('twitter_code_verifier');
+        console.log('🧹 Cleaned up Twitter code verifier');
+      }
+      
     } catch (error) {
       console.error('OAuth completion error:', error);
       
@@ -808,7 +834,34 @@ function App() {
   };
 
   // Authentication functions
-  const initiateOAuth = (platform: 'linkedin' | 'twitter') => {
+  // Helper function to generate PKCE parameters for Twitter
+  const generatePKCE = async () => {
+    // Generate a proper base64url-safe code verifier
+    const array = crypto.getRandomValues(new Uint8Array(32));
+    const codeVerifier = btoa(Array.from(array, byte => String.fromCharCode(byte)).join(''))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    // Generate code challenge using SHA256
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    
+    const codeChallenge = btoa(Array.from(new Uint8Array(hash), byte => String.fromCharCode(byte)).join(''))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    console.log('🔐 Generated PKCE parameters:', {
+      codeVerifier: codeVerifier.substring(0, 10) + '...',
+      codeChallenge: codeChallenge.substring(0, 10) + '...'
+    });
+    
+    return { codeVerifier, codeChallenge };
+  };
+
+  const initiateOAuth = async (platform: 'linkedin' | 'twitter') => {
     console.log('🚀 Initiating OAuth for', platform);
     console.log('🔧 OAuth config at initiation:', oauthConfig);
     
@@ -835,6 +888,21 @@ function App() {
       scope: config.scope,
       state: state
     });
+    
+    // Twitter requires PKCE (Proof Key for Code Exchange)
+    if (platform === 'twitter') {
+      try {
+        const { codeVerifier, codeChallenge } = await generatePKCE();
+        localStorage.setItem('twitter_code_verifier', codeVerifier);
+        params.append('code_challenge', codeChallenge);
+        params.append('code_challenge_method', 'S256');
+        console.log('✅ PKCE parameters generated for Twitter');
+      } catch (error) {
+        console.error('❌ Failed to generate PKCE parameters:', error);
+        alert('Failed to prepare Twitter authentication. Please try again.');
+        return;
+      }
+    }
     
     window.location.href = `${config.authUrl}?${params.toString()}`;
   };
@@ -902,6 +970,10 @@ function App() {
     }));
     
     localStorage.removeItem(`oauth_state_${platform}`);
+    // Clean up Twitter code verifier on logout
+    if (platform === 'twitter') {
+      localStorage.removeItem('twitter_code_verifier');
+    }
     alert(`✅ Logged out from ${platform}`);
   };
 

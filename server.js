@@ -145,12 +145,23 @@ app.post('/api/oauth/token', async (req, res) => {
         throw new Error('Twitter client secret not configured. Please set TWITTER_CLIENT_SECRET environment variable.');
       }
       
+      // Twitter requires PKCE - get code_verifier from request
+      const codeVerifier = req.body.codeVerifier;
+      if (!codeVerifier) {
+        throw new Error('Twitter OAuth requires PKCE code_verifier');
+      }
+      
+      console.log('🔐 Twitter PKCE code verifier received:', {
+        codeVerifier: codeVerifier.substring(0, 10) + '...',
+        length: codeVerifier.length
+      });
+      
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
         client_id: clientId,
         redirect_uri: redirectUri,
-        code_verifier: 'challenge' // Twitter requires PKCE
+        code_verifier: codeVerifier
       });
       
       const response = await fetch(tokenUrl, {
@@ -215,17 +226,58 @@ app.post('/api/linkedin/post', async (req, res) => {
     
     console.log('📤 Posting to LinkedIn via server...');
     
+    // Try to get the authenticated user's profile to get their URN
+    let userUrn = 'urn:li:person:~'; // Default fallback
+    
+    try {
+      // Try the /v2/people/~ endpoint first
+      const profileResponse = await fetch('https://api.linkedin.com/v2/people/~', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202506'
+        }
+      });
+      
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        userUrn = profileData.id;
+        console.log('✅ Got user URN from profile:', userUrn);
+      } else {
+        console.log('⚠️ Could not get user profile, trying /v2/userinfo...');
+        
+        // Try the userinfo endpoint as backup
+        const userinfoResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+            'LinkedIn-Version': '202506'
+          }
+        });
+        
+        if (userinfoResponse.ok) {
+          const userinfoData = await userinfoResponse.json();
+          userUrn = userinfoData.sub;
+          console.log('✅ Got user URN from userinfo:', userUrn);
+        } else {
+          console.log('⚠️ Could not get user info, using fallback URN');
+        }
+      }
+    } catch (profileError) {
+      console.log('⚠️ Profile fetch error, using fallback:', profileError.message);
+    }
+    
     // Use the newer LinkedIn Posts API with correct format
     const response = await fetch('https://api.linkedin.com/rest/posts', {
       method: 'POST',
-              headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0',
-          'LinkedIn-Version': '202506'
-        },
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'LinkedIn-Version': '202506'
+      },
       body: JSON.stringify({
-        author: 'urn:li:person:~',
+        author: userUrn,
         commentary: content,
         visibility: 'PUBLIC',
         distribution: {
@@ -240,10 +292,18 @@ app.post('/api/linkedin/post', async (req, res) => {
     
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('❌ LinkedIn API error:', response.status, errorData);
+      console.error('❌ LinkedIn API error:', response.status, response.statusText, errorData);
+      console.error('🔍 Request details:', {
+        url: 'https://api.linkedin.com/rest/posts',
+        method: 'POST',
+        author: userUrn,
+        contentLength: content.length
+      });
       return res.status(response.status).json({ 
         error: 'LinkedIn API error', 
-        details: errorData 
+        details: errorData,
+        status: response.status,
+        statusText: response.statusText
       });
     }
     
