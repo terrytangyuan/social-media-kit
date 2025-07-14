@@ -167,4 +167,4 @@ coverage/
 # Tailwind CSS
 # (uncomment if you have custom Tailwind builds)
 # tailwind.config.js
-# postcss.config.js 
+# postcss.config.js .env

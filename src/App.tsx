@@ -21,12 +21,12 @@ type OAuthConfig = {
   };
 };
 
-// Default OAuth configuration
+// Default OAuth configuration (fallback if server config fails)
 const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
   linkedin: {
     clientId: '',
     redirectUri: window.location.origin,
-    scope: 'w_member_social',
+          scope: 'w_member_social',
     authUrl: 'https://www.linkedin.com/oauth/v2/authorization'
   },
   twitter: {
@@ -100,6 +100,7 @@ function App() {
   // OAuth configuration state
   const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
   const [showOAuthSettings, setShowOAuthSettings] = useState(false);
+  const [oauthConfigLoaded, setOauthConfigLoaded] = useState(false);
   
   // Authentication state
   const [auth, setAuth] = useState<PlatformAuth>({
@@ -167,14 +168,82 @@ function App() {
       }
     }
     
-    if (savedOAuthConfig) {
+    // Load OAuth configuration from server first, then merge with localStorage
+    const loadOAuthConfig = async () => {
       try {
-        const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
-        setOauthConfig(parsedOAuthConfig);
+        console.log('🔄 Loading OAuth config from server...');
+        const response = await fetch('/api/oauth/config');
+        if (response.ok) {
+          const serverConfig = await response.json();
+          console.log('✅ Server OAuth config loaded:', serverConfig);
+          
+          // If we have saved config in localStorage, merge it with server config
+          if (savedOAuthConfig) {
+            try {
+              const localConfig = JSON.parse(savedOAuthConfig);
+              console.log('📋 Merging with localStorage config:', localConfig);
+              
+              // Merge configs - server provides LinkedIn/Twitter settings, localStorage provides Bluesky
+              const mergedConfig = {
+                linkedin: {
+                  ...serverConfig.linkedin
+                  // Client ID always comes from server
+                },
+                twitter: {
+                  ...serverConfig.twitter
+                  // Client ID always comes from server
+                },
+                bluesky: {
+                  ...serverConfig.bluesky,
+                  ...(localConfig.bluesky || {})
+                }
+              };
+              
+              console.log('✅ Final merged OAuth config:', mergedConfig);
+              setOauthConfig(mergedConfig);
+            } catch (error) {
+              console.error('Error parsing saved OAuth config:', error);
+              console.log('🔄 Using server config only');
+              setOauthConfig(serverConfig);
+            }
+          } else {
+            console.log('📋 No localStorage config, using server config');
+            setOauthConfig(serverConfig);
+          }
+        } else {
+          console.warn('⚠️ Failed to load OAuth config from server, using localStorage or defaults');
+          if (savedOAuthConfig) {
+            try {
+              const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
+              setOauthConfig(parsedOAuthConfig);
+            } catch (error) {
+              console.error('Error parsing saved OAuth config:', error);
+              setOauthConfig(DEFAULT_OAUTH_CONFIG);
+            }
+          } else {
+            setOauthConfig(DEFAULT_OAUTH_CONFIG);
+          }
+        }
       } catch (error) {
-        console.error('Error parsing saved OAuth config:', error);
+        console.error('Error loading OAuth config from server:', error);
+        console.log('🔄 Falling back to localStorage or defaults');
+        if (savedOAuthConfig) {
+          try {
+            const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
+            setOauthConfig(parsedOAuthConfig);
+          } catch (error) {
+            console.error('Error parsing saved OAuth config:', error);
+            setOauthConfig(DEFAULT_OAUTH_CONFIG);
+          }
+        } else {
+          setOauthConfig(DEFAULT_OAUTH_CONFIG);
+        }
+      } finally {
+        setOauthConfigLoaded(true);
       }
-    }
+    };
+    
+    loadOAuthConfig();
     
     if (saved) setText(saved);
     if (dark === "true") setDarkMode(true);
@@ -207,8 +276,22 @@ function App() {
   }, [auth]);
 
   useEffect(() => {
-    localStorage.setItem("oauthConfig", JSON.stringify(oauthConfig));
-  }, [oauthConfig]);
+    // Only save to localStorage after the config has been loaded initially
+    if (oauthConfigLoaded) {
+      // Save only Bluesky configuration to localStorage
+      // Client IDs are now managed server-side via .env file
+      const configToSave = {
+        bluesky: {
+          ...oauthConfig.bluesky
+        }
+      };
+      
+      console.log('💾 Saving OAuth config to localStorage (Bluesky only):', configToSave);
+      localStorage.setItem("oauthConfig", JSON.stringify(configToSave));
+    } else {
+      console.log('⏳ Skipping localStorage save - config not loaded yet');
+    }
+  }, [oauthConfig, oauthConfigLoaded]);
 
   useEffect(() => {
     // Check notification status on mount
@@ -231,10 +314,19 @@ function App() {
     
     // Handle OAuth callback
     const handleOAuthCallback = async () => {
+      console.log('🔄 OAuth callback triggered');
+      
+      // Debug: Log current state
+      console.log('🐛 Debug - Current oauthConfig:', oauthConfig);
+      console.log('🐛 Debug - oauthConfigLoaded:', oauthConfigLoaded);
+      console.log('🐛 Debug - localStorage oauthConfig:', localStorage.getItem('oauthConfig'));
+      
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       const error = urlParams.get('error');
+      
+      console.log('📝 URL params:', { code: code ? 'present' : 'missing', state: state ? 'present' : 'missing', error });
       
       if (error) {
         alert(`❌ OAuth Error: ${error}\n${urlParams.get('error_description') || 'Authentication failed'}`);
@@ -244,6 +336,8 @@ function App() {
       }
       
       if (code && state) {
+        console.log('🔧 Using current OAuth config state:', oauthConfig);
+        console.log('🔑 Current LinkedIn clientId:', oauthConfig.linkedin.clientId);
         // Determine platform from URL path or state
         let platform: 'linkedin' | 'twitter' | null = null;
         if (window.location.pathname.includes('/auth/linkedin')) {
@@ -259,10 +353,38 @@ function App() {
         }
         
         if (platform) {
+          console.log('🎯 Detected platform:', platform);
           const storedState = localStorage.getItem(`oauth_state_${platform}`);
+          console.log('🔑 State validation:', { received: state, stored: storedState, match: state === storedState });
+          
           if (state === storedState) {
             try {
-              await completeOAuthFlow(platform, code);
+              console.log('✅ Starting OAuth completion for', platform);
+              
+              // Re-fetch OAuth config from server to ensure we have the latest configuration
+              console.log('🔄 Re-fetching OAuth config from server for completion...');
+              let completionConfig = oauthConfig;
+              
+              try {
+                const response = await fetch('/api/oauth/config');
+                if (response.ok) {
+                  const serverConfig = await response.json();
+                  console.log('✅ Fresh server OAuth config loaded for completion:', serverConfig);
+                  completionConfig = serverConfig;
+                } else {
+                  console.warn('⚠️ Failed to re-fetch server config, using current state');
+                }
+              } catch (error) {
+                console.error('Error re-fetching server config:', error);
+                console.log('🔄 Using current oauthConfig state as fallback');
+              }
+              
+              console.log('🔧 Using OAuth config for completion:', completionConfig);
+              console.log('🔧 Platform config:', completionConfig[platform]);
+              console.log('🔑 clientId for completion:', completionConfig[platform]?.clientId);
+              
+              // Call completion function with fresh config
+              await completeOAuthFlow(platform, code, completionConfig);
             } catch (error) {
               console.error('OAuth completion error:', error);
               alert(`❌ Failed to complete ${platform} authentication: ${error}`);
@@ -300,7 +422,7 @@ function App() {
 
   const getMarkdownPreview = () => {
     const html = marked(text, { breaks: true });
-    return DOMPurify.sanitize(html);
+    return DOMPurify.sanitize(html as string);
   };
 
   const applyMarkdown = (wrapper: string) => {
@@ -569,13 +691,13 @@ function App() {
 
   // OAuth configuration functions
   const updateOAuthConfig = (platform: 'linkedin' | 'twitter', clientId: string) => {
-    setOauthConfig(prev => ({
-      ...prev,
-      [platform]: {
-        ...prev[platform],
-        clientId
-      }
-    }));
+    // Note: Client IDs now come from the server (.env file)
+    // This function is kept for backward compatibility but doesn't modify client IDs
+    console.log('Note: Client IDs are now configured via .env file on the server');
+    console.log('Attempted to update', platform, 'with clientId:', clientId);
+    
+    // Don't actually update the client ID since it comes from the server
+    // This prevents manual overrides from the UI
   };
 
   const updateBlueskyConfig = (server: string) => {
@@ -587,11 +709,42 @@ function App() {
     }));
   };
 
+  const clearOAuthLocalStorage = () => {
+    if (confirm('⚠️ This will clear all OAuth settings from localStorage and reload the page. Continue?')) {
+      localStorage.removeItem('oauthConfig');
+      localStorage.removeItem('oauth_state_linkedin');
+      localStorage.removeItem('oauth_state_twitter');
+      localStorage.removeItem('platformAuth');
+      console.log('🧹 Cleared OAuth localStorage');
+      window.location.reload();
+    }
+  };
+
   // OAuth completion function
-  const completeOAuthFlow = async (platform: 'linkedin' | 'twitter', code: string) => {
-    const config = oauthConfig[platform];
+  const completeOAuthFlow = async (platform: 'linkedin' | 'twitter', code: string, explicitConfig?: OAuthConfig) => {
+    const config = explicitConfig ? explicitConfig[platform] : oauthConfig[platform];
+    
+    console.log('OAuth Config for', platform, ':', config);
+    console.log('Client ID:', config.clientId);
+    console.log('Redirect URI:', config.redirectUri);
+    console.log('🔍 explicitConfig passed:', explicitConfig);
+    console.log('🔍 oauthConfig state:', oauthConfig);
+    
+    // Check if client ID is configured
+    if (!config.clientId) {
+      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED\n\nPlease:\n1. Open ⚙️ Settings\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save settings\n4. Try authentication again`);
+      return;
+    }
     
     try {
+      console.log('🔄 Starting token exchange for', platform);
+      console.log('📤 Token exchange request:', {
+        platform,
+        clientId: config.clientId,
+        redirectUri: config.redirectUri,
+        codeLength: code.length
+      });
+      
       // Exchange authorization code for access token
       const tokenResponse = await fetch('/api/oauth/token', {
         method: 'POST',
@@ -607,39 +760,26 @@ function App() {
       });
       
       if (!tokenResponse.ok) {
-        // If API endpoint doesn't exist (development), show manual token instructions
-        throw new Error(`OAuth token exchange failed. You may need to implement a backend token exchange service or manually configure tokens.`);
+        const errorData = await tokenResponse.text();
+        console.error('Token exchange failed with status:', tokenResponse.status);
+        console.error('Error response:', errorData);
+        throw new Error(`OAuth token exchange failed (${tokenResponse.status}): ${errorData}`);
       }
       
       const tokenData = await tokenResponse.json();
+      console.log('📥 Token response received:', tokenData);
       
-      // Fetch user profile
-      let userInfo;
-      if (platform === 'linkedin') {
-        const profileResponse = await fetch('https://api.linkedin.com/v2/people/~', {
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-          }
-        });
-        
-        if (!profileResponse.ok) {
-          throw new Error('Failed to fetch LinkedIn profile');
-        }
-        
-        userInfo = await profileResponse.json();
-      } else if (platform === 'twitter') {
-        const profileResponse = await fetch('https://api.twitter.com/2/users/me', {
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-          }
-        });
-        
-        if (!profileResponse.ok) {
-          throw new Error('Failed to fetch Twitter profile');
-        }
-        
-        userInfo = await profileResponse.json();
+      // User profile is now included in the token response from the server
+      let userInfo = tokenData.userProfile;
+      console.log('👤 User profile data:', userInfo);
+      
+      // Validate that we have some user info (even minimal)
+      if (!userInfo) {
+        console.warn('⚠️ No user profile data received from server');
+        userInfo = { authenticated: true, note: 'Profile data not available but posting should work' };
       }
+      
+      console.log('✅ Authentication successful with userInfo:', userInfo);
       
       // Update authentication state
       setAuth(prev => ({
@@ -669,13 +809,21 @@ function App() {
 
   // Authentication functions
   const initiateOAuth = (platform: 'linkedin' | 'twitter') => {
+    console.log('🚀 Initiating OAuth for', platform);
+    console.log('🔧 OAuth config at initiation:', oauthConfig);
+    
     const config = oauthConfig[platform];
+    console.log('📋 Platform config:', config);
+    console.log('🔑 Client ID check:', { clientId: config.clientId, isEmpty: !config.clientId || config.clientId === '' });
     
     // Check if client ID is properly configured
     if (!config.clientId || config.clientId === '') {
+      console.log('❌ Client ID validation failed');
       alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save the settings\n\nSee AUTHENTICATION_SETUP.md for detailed instructions.`);
       return;
     }
+    
+    console.log('✅ Client ID validation passed, proceeding with OAuth');
     
     const state = Math.random().toString(36).substring(2, 15);
     localStorage.setItem(`oauth_state_${platform}`, state);
@@ -764,6 +912,10 @@ function App() {
       throw new Error('Not authenticated with LinkedIn');
     }
     
+    console.log('📤 Posting to LinkedIn...');
+    
+    // LinkedIn UGC API supports using "person:~" for the authenticated user
+    // This eliminates the need to fetch profile data first
     const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
       method: 'POST',
       headers: {
@@ -772,7 +924,7 @@ function App() {
         'X-Restli-Protocol-Version': '2.0.0'
       },
       body: JSON.stringify({
-        author: `urn:li:person:${authData.userInfo.id}`,
+        author: 'urn:li:person:~',
         lifecycleState: 'PUBLISHED',
         specificContent: {
           'com.linkedin.ugc.ShareContent': {
@@ -1334,9 +1486,10 @@ function App() {
                     <ol className="text-xs space-y-1">
                       <li>1. Go to <a href="https://www.linkedin.com/developers/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">LinkedIn Developer Portal</a></li>
                       <li>2. Create a new app or select existing one</li>
-                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173</code></li>
+                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
                       <li>4. Enable scope: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>w_member_social</code></li>
-                      <li>5. Copy the Client ID and paste it below</li>
+                      <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>LINKEDIN_CLIENT_ID</code></li>
+                      <li>6. Restart the server to load the new configuration</li>
                     </ol>
                   </div>
                   <div>
@@ -1349,9 +1502,10 @@ function App() {
                       onChange={(e) => updateOAuthConfig('linkedin', e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
                       placeholder="86abc123def456789"
+                      disabled={true}
                     />
                     <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {oauthConfig.linkedin.clientId ? '✅ LinkedIn Client ID configured' : '⚠️ Client ID required for LinkedIn posting'}
+                      {oauthConfig.linkedin.clientId ? '✅ LinkedIn Client ID configured via .env file' : '⚠️ Client ID required - add LINKEDIN_CLIENT_ID to .env file'}
                     </p>
                   </div>
                 </div>
@@ -1365,9 +1519,10 @@ function App() {
                     <ol className="text-xs space-y-1">
                       <li>1. Go to <a href="https://developer.twitter.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Twitter Developer Portal</a></li>
                       <li>2. Create a new app or select existing one</li>
-                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:5173</code></li>
+                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
                       <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
-                      <li>5. Copy the Client ID and paste it below</li>
+                      <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>TWITTER_CLIENT_ID</code></li>
+                      <li>6. Restart the server to load the new configuration</li>
                     </ol>
                   </div>
                   <div>
@@ -1380,9 +1535,10 @@ function App() {
                       onChange={(e) => updateOAuthConfig('twitter', e.target.value)}
                       className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
                       placeholder="TwItTeRcLiEnTiD123456789"
+                      disabled={true}
                     />
                     <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured' : '⚠️ Client ID required for Twitter posting'}
+                      {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured via .env file' : '⚠️ Client ID required - add TWITTER_CLIENT_ID to .env file'}
                     </p>
                   </div>
                 </div>
@@ -1433,18 +1589,26 @@ function App() {
               </div>
               <div className="flex justify-between items-center">
                 <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  💡 Settings are automatically saved
+                  💡 Client IDs are configured via .env file
                 </div>
-                <button
-                  onClick={() => {
-                    if (confirm('Reset all OAuth settings to default?')) {
-                      setOauthConfig(DEFAULT_OAUTH_CONFIG);
-                    }
-                  }}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
-                >
-                  🔄 Reset to Default
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={clearOAuthLocalStorage}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-orange-500 hover:bg-orange-600 text-white"}`}
+                  >
+                    🧹 Clear Cache
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Reset all OAuth settings to default?')) {
+                        setOauthConfig(DEFAULT_OAUTH_CONFIG);
+                      }
+                    }}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                  >
+                    🔄 Reset to Default
+                  </button>
+                </div>
               </div>
             </div>
           </div>
