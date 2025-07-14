@@ -34,16 +34,8 @@ A comprehensive social media management tool designed to help you create, format
 - **Visual Status**: Green checkmarks (✓) show authentication status for each platform
 
 ### 😊 **Comprehensive Emoji Picker**
-- **6 Categories**: 
-  - Smileys & People (100+ emojis)
-  - Animals & Nature (100+ emojis)
-  - Food & Drink (100+ emojis)
-  - Activities (100+ emojis)
-  - Travel & Places (100+ emojis)
-  - Objects (150+ emojis)
-  - Symbols (200+ emojis)
+- **6 Categories with Grid Layout**: Organized 8-column grid for easy browsing
 - **Easy Insertion**: Click any emoji to insert at cursor position
-- **Grid Layout**: Organized 8-column grid for easy browsing
 
 ### 📝 **Post Management System**
 - **Create & Edit**: Multiple posts with custom titles and content
@@ -54,11 +46,7 @@ A comprehensive social media management tool designed to help you create, format
 
 ### ⏰ **Scheduling & Reminders**
 - **Date/Time Picker**: Set reminders for when to post
-- **32+ Timezone Support**: Global timezone selection including:
-  - US timezones (Eastern, Central, Mountain, Pacific, Alaska, Hawaii)
-  - European timezones (London, Paris, Berlin, Rome, etc.)
-  - Asian timezones (Tokyo, Shanghai, Singapore, etc.)
-  - And many more worldwide locations
+- **32+ Timezone Support**: Global timezone selections
 - **Browser Notifications**: Get notified when it's time to post
 - **Timezone Display**: Shows scheduled time in selected timezone
 
