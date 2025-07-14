@@ -4,8 +4,6 @@ A comprehensive social media management tool designed to help you create, format
 
 ⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
-📋 **Version 0.2.0** - All major authentication and posting issues have been resolved! See [CHANGELOG.md](CHANGELOG.md) for complete details.
-
 <div align="center">
   <img src="screenshots/main-interface.png" alt="Social Media Kit Main Interface" width="800"/>
 </div>
@@ -89,17 +87,6 @@ A comprehensive social media management tool designed to help you create, format
 - **Express.js** backend server for OAuth token exchange
 - **Node.js** server-side API endpoints for secure posting
 
-## 🆕 What's New in v0.2.0
-
-### **Major Issues Resolved**
-All authentication and posting issues have been fixed! See [CHANGELOG.md](CHANGELOG.md) for complete details.
-
-### **Key Improvements**
-- ✅ **LinkedIn & Twitter Authentication**: Fixed all OAuth and posting issues
-- ✅ **Server-Side Posting**: Added secure endpoints to prevent CORS issues
-- ✅ **Enhanced Error Handling**: Better debugging and user feedback
-- ✅ **Production Ready**: Simplified deployment with `npm start`
-
 ## 📦 Installation
 
 ### Prerequisites
@@ -110,7 +97,7 @@ All authentication and posting issues have been fixed! See [CHANGELOG.md](CHANGE
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/terrytangyuan/social-media-kit
    cd social-media-kit
    ```
 
