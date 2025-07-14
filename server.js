@@ -204,6 +204,63 @@ app.post('/api/oauth/token', async (req, res) => {
   }
 });
 
+// LinkedIn posting endpoint
+app.post('/api/linkedin/post', async (req, res) => {
+  try {
+    const { content, accessToken } = req.body;
+    
+    if (!content || !accessToken) {
+      return res.status(400).json({ error: 'Content and access token are required' });
+    }
+    
+    console.log('📤 Posting to LinkedIn via server...');
+    
+    // Use the newer LinkedIn Posts API with correct format
+    const response = await fetch('https://api.linkedin.com/rest/posts', {
+      method: 'POST',
+              headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202506'
+        },
+      body: JSON.stringify({
+        author: 'urn:li:person:~',
+        commentary: content,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED',
+          targetEntities: [],
+          thirdPartyDistributionChannels: []
+        },
+        lifecycleState: 'PUBLISHED',
+        isReshareDisabledByAuthor: false
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ LinkedIn API error:', response.status, errorData);
+      return res.status(response.status).json({ 
+        error: 'LinkedIn API error', 
+        details: errorData 
+      });
+    }
+    
+    const result = await response.json();
+    console.log('✅ LinkedIn post successful:', result);
+    
+    res.json({ success: true, data: result });
+    
+  } catch (error) {
+    console.error('❌ LinkedIn posting error:', error);
+    res.status(500).json({ 
+      error: 'LinkedIn posting failed', 
+      details: error.message 
+    });
+  }
+});
+
 // Serve the frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

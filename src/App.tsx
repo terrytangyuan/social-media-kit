@@ -914,29 +914,15 @@ function App() {
     
     console.log('📤 Posting to LinkedIn...');
     
-    // LinkedIn UGC API supports using "person:~" for the authenticated user
-    // This eliminates the need to fetch profile data first
-    const response = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+    // Use our server endpoint to post to LinkedIn (avoids CORS issues) - v2
+    const response = await fetch('/api/linkedin/post', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${authData.accessToken}`,
-        'Content-Type': 'application/json',
-        'X-Restli-Protocol-Version': '2.0.0'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        author: 'urn:li:person:~',
-        lifecycleState: 'PUBLISHED',
-        specificContent: {
-          'com.linkedin.ugc.ShareContent': {
-            shareCommentary: {
-              text: content
-            },
-            shareMediaCategory: 'NONE'
-          }
-        },
-        visibility: {
-          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
-        }
+        content: content,
+        accessToken: authData.accessToken
       })
     });
     
