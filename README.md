@@ -4,6 +4,8 @@ A comprehensive social media management tool designed to help you create, format
 
 ⭐ Found this tool helpful? Give it a star on GitHub to support the project and help others discover it!
 
+📋 **Version 0.2.0** - All major authentication and posting issues have been resolved! See [CHANGELOG.md](CHANGELOG.md) for complete details.
+
 <div align="center">
   <img src="screenshots/main-interface.png" alt="Social Media Kit Main Interface" width="800"/>
 </div>
@@ -84,6 +86,19 @@ A comprehensive social media management tool designed to help you create, format
 - **Marked** for markdown parsing
 - **DOMPurify** for safe HTML sanitization
 - **localStorage** for data persistence
+- **Express.js** backend server for OAuth token exchange
+- **Node.js** server-side API endpoints for secure posting
+
+## 🆕 What's New in v0.2.0
+
+### **Major Issues Resolved**
+All authentication and posting issues have been fixed! See [CHANGELOG.md](CHANGELOG.md) for complete details.
+
+### **Key Improvements**
+- ✅ **LinkedIn & Twitter Authentication**: Fixed all OAuth and posting issues
+- ✅ **Server-Side Posting**: Added secure endpoints to prevent CORS issues
+- ✅ **Enhanced Error Handling**: Better debugging and user feedback
+- ✅ **Production Ready**: Simplified deployment with `npm start`
 
 ## 📦 Installation
 
@@ -104,14 +119,34 @@ A comprehensive social media management tool designed to help you create, format
    npm install
    ```
 
-3. **Start the development server**
+3. **Set up environment variables**
    ```bash
-   npm run dev
+   cp .env.example .env
+   # Edit .env file with your LinkedIn and Twitter client secrets
    ```
 
-4. **Open your browser**
-   - Navigate to `http://localhost:5173` (or the port shown in terminal)
-   - The app will automatically reload when you make changes
+4. **Start the production server**
+   ```bash
+   npm start
+   ```
+
+5. **Open your browser**
+   - Navigate to `http://localhost:3000`
+   - The app serves both frontend and backend from the same port
+
+📋 **For detailed setup instructions including OAuth configuration, see [Complete Setup Guide](SETUP.md)**
+
+### Development Mode
+
+For development with hot reload:
+
+```bash
+# Terminal 1: Start the backend server
+npm run server
+
+# Terminal 2: Start the frontend dev server
+npm run dev
+```
 
 ### Build for Production
 
@@ -120,12 +155,6 @@ npm run build
 ```
 
 The built files will be in the `dist` directory.
-
-### Preview Production Build
-
-```bash
-npm run preview
-```
 
 ## 🎯 How to Use
 
@@ -219,14 +248,23 @@ Chunking intelligently breaks at:
 ## 🐛 Troubleshooting
 
 ### **Authentication Issues**
-- **"CLIENT ID NOT CONFIGURED"**: Open ⚙️ Settings and enter your platform credentials
-- **OAuth redirect fails**: Verify redirect URLs match exactly in developer portals
+- **"CLIENT ID NOT CONFIGURED"**: Add your client ID to `.env` file and restart server
+- **OAuth redirect fails**: Verify redirect URLs match exactly (`http://localhost:3000`)
 - **Token expired**: Re-authenticate by clicking "Login" again
+- **LinkedIn 403 errors**: Ensure required products are enabled in LinkedIn Developer Portal
+- **Twitter auth errors**: Verify app type is "Web App" (not "Confidential Client")
 
 ### **Posting Problems**
 - **API errors**: Check your API permissions and rate limits in developer portals
 - **Network issues**: Verify internet connection and try again
 - **Platform downtime**: Check if the social media platform is experiencing issues
+- **Permission denied**: Verify your app has proper read/write permissions
+
+### **Server Issues**
+- **Port 3000 in use**: Kill existing processes with `sudo lsof -ti:3000 | xargs sudo kill -9`
+- **Environment variables not loading**: Ensure `.env` file exists and restart server
+- **Module not found**: Run `npm install` to install dependencies
+- **Build errors**: Try `npm run build` to rebuild the application
 
 ### **Browser Compatibility**
 - **Copy function not working**: Try the "🖱️ Select All Text" button for manual copy
@@ -234,9 +272,10 @@ Chunking intelligently breaks at:
 - **Dark mode issues**: Refresh the page if theme doesn't apply completely
 
 ### **Development vs Production**
-- **Local development**: Uses `http://localhost:5173` redirect URIs
+- **Local development**: Uses `http://localhost:3000` redirect URIs
 - **Production deployment**: Update redirect URIs to your production domain
-- **CORS issues**: Ensure your app is running on the correct domain
+
+**📋 For detailed troubleshooting and recent fixes, see [CHANGELOG.md](CHANGELOG.md)**
 
 ## 📝 License
 

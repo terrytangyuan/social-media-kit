@@ -826,7 +826,7 @@ function App() {
       
       // For development - show manual instructions
       if (error instanceof Error && error.message.includes('OAuth token exchange failed')) {
-        alert(`⚠️ ${platform.toUpperCase()} AUTHENTICATION INCOMPLETE\n\nThis app needs a backend service to complete OAuth. For development:\n\n1. The authorization was successful\n2. You need to manually exchange the code for a token\n3. Or implement a backend OAuth handler\n\nSee AUTHENTICATION_SETUP.md for details.`);
+        alert(`⚠️ ${platform.toUpperCase()} AUTHENTICATION INCOMPLETE\n\nThis app needs a backend service to complete OAuth. For development:\n\n1. The authorization was successful\n2. You need to manually exchange the code for a token\n3. Or implement a backend OAuth handler\n\nSee SETUP.md for details.`);
       } else {
         throw error;
       }
@@ -872,7 +872,7 @@ function App() {
     // Check if client ID is properly configured
     if (!config.clientId || config.clientId === '') {
       console.log('❌ Client ID validation failed');
-      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save the settings\n\nSee AUTHENTICATION_SETUP.md for detailed instructions.`);
+      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save the settings\n\nSee SETUP.md for detailed instructions.`);
       return;
     }
     
