@@ -142,6 +142,7 @@ function App() {
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const undoTimeoutRef = useRef<number>();
 
   const PLATFORM_LIMITS = {
     linkedin: 3000, // LinkedIn doesn't have strict limit, but 3000 is good practice
@@ -167,6 +168,11 @@ function App() {
     twitter: '',
     bluesky: ''
   });
+
+  // Undo/Redo state
+  const [undoHistory, setUndoHistory] = useState<Array<{ text: string; selection: { start: number; end: number } }>>([]);
+  const [redoHistory, setRedoHistory] = useState<Array<{ text: string; selection: { start: number; end: number } }>>([]);
+  const [isUndoRedoAction, setIsUndoRedoAction] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("socialMediaDraft");
@@ -475,6 +481,35 @@ function App() {
     };
   }, [showEmojiPicker]);
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          performUndo();
+        } else if (event.key === 'y' || (event.key === 'z' && event.shiftKey)) {
+          event.preventDefault();
+          performRedo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [undoHistory, redoHistory, text]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const getMarkdownPreview = () => {
     const html = marked(text, { breaks: true });
     return DOMPurify.sanitize(html as string);
@@ -483,6 +518,9 @@ function App() {
   const applyMarkdown = (wrapper: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    // Save state before making changes
+    saveUndoState();
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -534,6 +572,9 @@ function App() {
   const insertEmoji = (emoji: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    // Save state before making changes
+    saveUndoState();
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -1685,11 +1726,113 @@ function App() {
     const after = text.substring(end);
 
     const tag = `@{${personName}}`;
+    
+    // Save state before making changes
+    saveUndoState();
+    
     setText(before + tag + after);
 
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + tag.length, start + tag.length);
+    }, 0);
+  };
+
+  // Debounced text change handler
+  const handleTextChange = (newText: string) => {
+    setText(newText);
+    
+    // Clear existing timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+    
+    // Set new timeout to save undo state after user stops typing
+    undoTimeoutRef.current = window.setTimeout(() => {
+      if (!isUndoRedoAction) {
+        saveUndoState();
+      }
+    }, 500); // Save state after 500ms of no typing
+  };
+
+  // Undo/Redo functions
+  const saveUndoState = () => {
+    if (isUndoRedoAction) return; // Don't save state during undo/redo operations
+    
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const currentState = {
+      text: text,
+      selection: {
+        start: textarea.selectionStart,
+        end: textarea.selectionEnd
+      }
+    };
+
+    setUndoHistory(prev => [...prev, currentState].slice(-50)); // Keep last 50 states
+    setRedoHistory([]); // Clear redo history when new action is performed
+  };
+
+  const performUndo = () => {
+    if (undoHistory.length === 0) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    setIsUndoRedoAction(true);
+
+    // Save current state to redo history
+    const currentState = {
+      text: text,
+      selection: {
+        start: textarea.selectionStart,
+        end: textarea.selectionEnd
+      }
+    };
+    setRedoHistory(prev => [...prev, currentState]);
+
+    // Restore previous state
+    const previousState = undoHistory[undoHistory.length - 1];
+    setUndoHistory(prev => prev.slice(0, -1));
+    
+    setText(previousState.text);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(previousState.selection.start, previousState.selection.end);
+      setIsUndoRedoAction(false);
+    }, 0);
+  };
+
+  const performRedo = () => {
+    if (redoHistory.length === 0) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    setIsUndoRedoAction(true);
+
+    // Save current state to undo history
+    const currentState = {
+      text: text,
+      selection: {
+        start: textarea.selectionStart,
+        end: textarea.selectionEnd
+      }
+    };
+    setUndoHistory(prev => [...prev, currentState]);
+
+    // Restore next state
+    const nextState = redoHistory[redoHistory.length - 1];
+    setRedoHistory(prev => prev.slice(0, -1));
+    
+    setText(nextState.text);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(nextState.selection.start, nextState.selection.end);
+      setIsUndoRedoAction(false);
     }, 0);
   };
 
@@ -2037,7 +2180,7 @@ function App() {
             }`}
             placeholder="Write your post here..."
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => handleTextChange(e.target.value)}
           />
           {/* Resize handle indicator */}
           <div className={`absolute bottom-1 right-1 w-3 h-3 pointer-events-none opacity-30 ${
