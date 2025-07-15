@@ -49,12 +49,24 @@ type AuthState = {
 };
 
 type PlatformAuth = {
-  linkedin: AuthState;
-  twitter: AuthState;
-  bluesky: AuthState & {
-    handle: string;
-    appPassword: string;
-  };
+  linkedin: AuthState & { handle?: string; appPassword?: string };
+  twitter: AuthState & { handle?: string; appPassword?: string };
+  bluesky: AuthState & { handle?: string; appPassword?: string };
+};
+
+// Add unified tagging types
+type PersonMapping = {
+  id: string;
+  name: string;
+  displayName: string;
+  twitter?: string;
+  bluesky?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type TaggingState = {
+  personMappings: PersonMapping[];
 };
 
 function App() {
@@ -137,6 +149,25 @@ function App() {
     bluesky: 300
   };
 
+  // Add unified tagging state
+  const [taggingState, setTaggingState] = useState<TaggingState>({
+    personMappings: []
+  });
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [newPersonMapping, setNewPersonMapping] = useState<Omit<PersonMapping, 'id' | 'createdAt' | 'updatedAt'>>({
+    name: '',
+    displayName: '',
+    twitter: '',
+    bluesky: ''
+  });
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [editPersonMapping, setEditPersonMapping] = useState<Omit<PersonMapping, 'id' | 'createdAt' | 'updatedAt'>>({
+    name: '',
+    displayName: '',
+    twitter: '',
+    bluesky: ''
+  });
+
   useEffect(() => {
     const saved = localStorage.getItem("socialMediaDraft");
     const dark = localStorage.getItem("darkMode");
@@ -145,6 +176,7 @@ function App() {
     const savedPosts = localStorage.getItem("socialMediaPosts");
     const savedAuth = localStorage.getItem("platformAuth");
     const savedOAuthConfig = localStorage.getItem("oauthConfig");
+    const savedTagging = localStorage.getItem("unifiedTagging");
     
     if (savedPosts) {
       const parsedPosts = JSON.parse(savedPosts);
@@ -165,6 +197,16 @@ function App() {
         setAuth(parsedAuth);
       } catch (error) {
         console.error('Error parsing saved auth:', error);
+      }
+    }
+    
+    // Load saved tagging state
+    if (savedTagging) {
+      try {
+        const parsedTagging = JSON.parse(savedTagging);
+        setTaggingState(parsedTagging);
+      } catch (error) {
+        console.error('Error parsing saved tagging state:', error);
       }
     }
     
@@ -274,6 +316,15 @@ function App() {
   useEffect(() => {
     localStorage.setItem("platformAuth", JSON.stringify(auth));
   }, [auth]);
+
+  useEffect(() => {
+    localStorage.setItem("oauthConfig", JSON.stringify(oauthConfig));
+  }, [oauthConfig]);
+
+  // Add tagging state persistence
+  useEffect(() => {
+    localStorage.setItem("unifiedTagging", JSON.stringify(taggingState));
+  }, [taggingState]);
 
   useEffect(() => {
     // Only save to localStorage after the config has been loaded initially
@@ -1333,8 +1384,9 @@ function App() {
   };
 
   const formatForPlatform = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
-    // All platforms support Unicode styled text
-    return toUnicodeStyle(text);
+    // First process unified tags, then apply Unicode styling
+    const processedText = processUnifiedTags(text, platform);
+    return toUnicodeStyle(processedText);
   };
 
   const toUnicodeStyle = (text: string): string => {
@@ -1487,6 +1539,145 @@ function App() {
       timeouts.forEach(timeout => clearTimeout(timeout));
     };
   }, [posts]);
+
+  // Add unified tagging functions
+  const addPersonMapping = () => {
+    if (!newPersonMapping.name.trim() || !newPersonMapping.displayName.trim()) {
+      alert('❌ Please enter both name and display name');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const personMapping: PersonMapping = {
+      id: Date.now().toString(),
+      ...newPersonMapping,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setTaggingState(prev => ({
+      ...prev,
+      personMappings: [...prev.personMappings, personMapping]
+    }));
+
+    // Reset form
+    setNewPersonMapping({
+      name: '',
+      displayName: '',
+      twitter: '',
+      bluesky: ''
+    });
+
+    alert('✅ Person mapping added successfully!');
+  };
+
+  const updatePersonMapping = (id: string, updates: Partial<PersonMapping>) => {
+    setTaggingState(prev => ({
+      ...prev,
+      personMappings: prev.personMappings.map(person =>
+        person.id === id
+          ? { ...person, ...updates, updatedAt: new Date().toISOString() }
+          : person
+      )
+    }));
+  };
+
+  const deletePersonMapping = (id: string) => {
+    const person = taggingState.personMappings.find(p => p.id === id);
+    if (person && confirm(`Delete mapping for "${person.displayName}"?`)) {
+      setTaggingState(prev => ({
+        ...prev,
+        personMappings: prev.personMappings.filter(p => p.id !== id)
+      }));
+    }
+  };
+
+  const startEditingPerson = (id: string) => {
+    const person = taggingState.personMappings.find(p => p.id === id);
+    if (person) {
+      setEditingPersonId(id);
+      setEditPersonMapping({
+        name: person.name,
+        displayName: person.displayName,
+        twitter: person.twitter || '',
+        bluesky: person.bluesky || ''
+      });
+    }
+  };
+
+  const saveEditedPerson = () => {
+    if (editingPersonId) {
+      updatePersonMapping(editingPersonId, editPersonMapping);
+      setEditingPersonId(null);
+      setEditPersonMapping({
+        name: '',
+        displayName: '',
+        twitter: '',
+        bluesky: ''
+      });
+      alert('✅ Person mapping updated successfully!');
+    }
+  };
+
+  const cancelEditingPerson = () => {
+    setEditingPersonId(null);
+    setEditPersonMapping({
+      name: '',
+      displayName: '',
+      twitter: '',
+      bluesky: ''
+    });
+  };
+
+  const processUnifiedTags = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
+    let processedText = text;
+
+    // Process unified tags like @{Person Name}
+    const tagPattern = /@\{([^}]+)\}/g;
+    processedText = processedText.replace(tagPattern, (match, personName) => {
+      const person = taggingState.personMappings.find(p => 
+        p.name.toLowerCase() === personName.toLowerCase() || 
+        p.displayName.toLowerCase() === personName.toLowerCase()
+      );
+
+      if (person) {
+        switch (platform) {
+          case 'linkedin':
+            // For LinkedIn, always use display name since manual tagging is required
+            return `@${person.displayName}`;
+          case 'twitter':
+            return person.twitter ? `@${person.twitter}` : `@${person.displayName}`;
+          case 'bluesky':
+            return person.bluesky ? `@${person.bluesky}` : `@${person.displayName}`;
+          default:
+            return `@${person.displayName}`;
+        }
+      }
+
+      // If no mapping found, just return the display name
+      return `@${personName}`;
+    });
+
+    return processedText;
+  };
+
+  const insertUnifiedTag = (personName: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+
+    const tag = `@{${personName}}`;
+    setText(before + tag + after);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + tag.length, start + tag.length);
+    }, 0);
+  };
 
   return (
     <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} min-h-screen p-6`}>
@@ -1893,6 +2084,12 @@ function App() {
               </div>
             )}
           </div>
+          <button 
+            onClick={() => setShowTagManager(true)} 
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
+          >
+            🏷️ Tags
+          </button>
         </div>
 
         <div className={`flex justify-between items-center mb-4 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
@@ -2045,6 +2242,11 @@ function App() {
             <h2 className="text-xl font-semibold mb-2">
               {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'} Preview
             </h2>
+            {selectedPlatform === 'linkedin' && (
+              <div className={`text-sm p-3 rounded-lg mb-4 ${darkMode ? "bg-yellow-900 text-yellow-200" : "bg-yellow-100 text-yellow-800"}`}>
+                💡 <strong>LinkedIn Tagging Tip:</strong> After pasting, type @ in LinkedIn and select the person from the dropdown to create a proper tag. The @names in this preview help you remember who to tag.
+              </div>
+            )}
             {(() => {
               const chunks = chunkText(text, selectedPlatform);
               const formattedChunks = chunks.map((chunk) => {
@@ -2198,6 +2400,232 @@ function App() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Tag Manager Modal */}
+        {showTagManager && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-lg ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">🏷️ Unified Tagging Manager</h2>
+                  <button
+                    onClick={() => setShowTagManager(false)}
+                    className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Usage Instructions */}
+                <div className={`mb-6 p-4 rounded-lg ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                  <h3 className="font-semibold mb-2">🎯 How to Use Unified Tagging</h3>
+                  <div className="text-sm space-y-1">
+                    <p>• In your posts, use <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-blue-200"}`}>@{"{Person Name}"}</code> to tag someone</p>
+                    <p>• Example: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-blue-200"}`}>@{"{Yuan Tang}"}</code> will automatically convert to:</p>
+                    <p className="ml-4">- LinkedIn: @Yuan Tang (manual tagging required)</p>
+                    <p className="ml-4">- X/Twitter: @TerryTangYuan</p>
+                    <p className="ml-4">- Bluesky: @terrytangyuan.xyz</p>
+                  </div>
+                </div>
+
+                {/* Add New Person */}
+                <div className={`mb-6 p-4 rounded-lg border ${darkMode ? "border-gray-600 bg-gray-700" : "border-gray-300 bg-gray-50"}`}>
+                  <h3 className="font-semibold mb-3">➕ Add New Person</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Name (for tagging)</label>
+                      <input
+                        type="text"
+                        value={newPersonMapping.name}
+                        onChange={(e) => setNewPersonMapping(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Yuan Tang"
+                        className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Display Name</label>
+                      <input
+                        type="text"
+                        value={newPersonMapping.displayName}
+                        onChange={(e) => setNewPersonMapping(prev => ({ ...prev, displayName: e.target.value }))}
+                        placeholder="Yuan Tang"
+                        className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      />
+                      <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Used for LinkedIn tagging (manual @ selection required after pasting)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">X/Twitter (optional)</label>
+                      <input
+                        type="text"
+                        value={newPersonMapping.twitter}
+                        onChange={(e) => setNewPersonMapping(prev => ({ ...prev, twitter: e.target.value }))}
+                        placeholder="TerryTangYuan"
+                        className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Bluesky (optional)</label>
+                      <input
+                        type="text"
+                        value={newPersonMapping.bluesky}
+                        onChange={(e) => setNewPersonMapping(prev => ({ ...prev, bluesky: e.target.value }))}
+                        placeholder="terrytangyuan.xyz"
+                        className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={addPersonMapping}
+                    className="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    ➕ Add Person
+                  </button>
+                </div>
+
+                {/* Existing People */}
+                <div>
+                  <h3 className="font-semibold mb-3">👥 Existing People ({taggingState.personMappings.length})</h3>
+                  {taggingState.personMappings.length === 0 ? (
+                    <p className={`text-center py-8 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      No people added yet. Add your first person above!
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {taggingState.personMappings.map((person) => (
+                        <div key={person.id} className={`p-4 rounded-lg border ${darkMode ? "border-gray-600 bg-gray-700" : "border-gray-300 bg-gray-50"}`}>
+                          {editingPersonId === person.id ? (
+                            // Edit form
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center">
+                                <h4 className="font-medium">✏️ Edit Person</h4>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={saveEditedPerson}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                  >
+                                    ✅ Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingPerson}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                  >
+                                    ❌ Cancel
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Name (for tagging)</label>
+                                  <input
+                                    type="text"
+                                    value={editPersonMapping.name}
+                                    onChange={(e) => setEditPersonMapping(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Yuan Tang"
+                                    className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Display Name</label>
+                                  <input
+                                    type="text"
+                                    value={editPersonMapping.displayName}
+                                    onChange={(e) => setEditPersonMapping(prev => ({ ...prev, displayName: e.target.value }))}
+                                    placeholder="Yuan Tang"
+                                    className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                                  />
+                                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                    Used for LinkedIn tagging (manual @ selection required after pasting)
+                                  </p>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">X/Twitter (optional)</label>
+                                  <input
+                                    type="text"
+                                    value={editPersonMapping.twitter}
+                                    onChange={(e) => setEditPersonMapping(prev => ({ ...prev, twitter: e.target.value }))}
+                                    placeholder="TerryTangYuan"
+                                    className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Bluesky (optional)</label>
+                                  <input
+                                    type="text"
+                                    value={editPersonMapping.bluesky}
+                                    onChange={(e) => setEditPersonMapping(prev => ({ ...prev, bluesky: e.target.value }))}
+                                    placeholder="terrytangyuan.xyz"
+                                    className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            // Display mode
+                            <>
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <h4 className="font-medium">{person.displayName}</h4>
+                                  <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                    Tag with: <code className={`px-1 rounded ${darkMode ? "bg-gray-600" : "bg-gray-200"}`}>@{"{" + person.name + "}"}</code>
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      insertUnifiedTag(person.name);
+                                      setShowTagManager(false);
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                  >
+                                    📝 Insert
+                                  </button>
+                                  <button
+                                    onClick={() => startEditingPerson(person.id)}
+                                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                  >
+                                    ✏️ Edit
+                                  </button>
+                                  <button
+                                    onClick={() => deletePersonMapping(person.id)}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded transition-colors"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                <div>
+                                  <span className="font-medium">💼 LinkedIn:</span>
+                                  <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    @{person.displayName}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">🐦 X/Twitter:</span>
+                                  <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    {person.twitter ? `@${person.twitter}` : 'Not set'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">🦋 Bluesky:</span>
+                                  <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    {person.bluesky ? `@${person.bluesky}` : 'Not set'}
+                                  </p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
