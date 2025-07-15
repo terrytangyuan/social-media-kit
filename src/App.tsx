@@ -597,31 +597,7 @@ function App() {
     setScheduleTime(currentTime);
   };
 
-  const saveToDraft = () => {
-    if (!currentPostId) {
-      // Create new post with current content
-      const currentTime = getCurrentDateTimeString();
-      const newPost = {
-        id: Date.now().toString(),
-        title: `Post ${posts.length + 1}`,
-        content: text,
-        scheduleTime: currentTime,
-        timezone: timezone,
-        createdAt: new Date().toISOString()
-      };
-      setPosts(prev => [...prev, newPost]);
-      setCurrentPostId(newPost.id);
-      setScheduleTime(currentTime);
-      return;
-    }
-    
-    // Update existing post with current content
-    setPosts(prev => prev.map(post => 
-      post.id === currentPostId 
-        ? { ...post, content: text, scheduleTime, timezone }
-        : post
-    ));
-  };
+
 
   const saveCurrentPost = () => {
     if (!currentPostId) {
@@ -2016,12 +1992,7 @@ function App() {
               </div>
             )}
           </div>
-          <button 
-            onClick={saveToDraft}
-            className={`px-3 py-1 rounded-xl text-sm ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
-          >
-            💾 Save to Draft
-          </button>
+
         </div>
 
         <div className="relative mb-4">

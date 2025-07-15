@@ -79,7 +79,17 @@ textarea[class*="resize-y"] {
   background-repeat: no-repeat;
 }
 
-/* Ensure resize cursor is visible */
+/* Ensure resize cursor is only visible on the resize handle area */
+textarea[class*="resize-y"] {
+  cursor: text; /* Default cursor for textarea */
+}
+
+/* Only show resize cursor on the actual resize handle area (bottom right corner) */
 textarea[class*="resize-y"]:hover {
-  cursor: ns-resize;
+  cursor: text; /* Keep text cursor for main area */
+}
+
+/* Target the resize handle area specifically */
+textarea[class*="resize-y"]::-webkit-resizer {
+  cursor: nw-resize;
 }
