@@ -2263,6 +2263,12 @@ function App() {
               </div>
             )}
           </div>
+          <button 
+            onClick={() => setShowTagManager(true)} 
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
+          >
+            🏷️ Tags
+          </button>
 
         </div>
 
@@ -2347,12 +2353,6 @@ function App() {
               </div>
             )}
           </div>
-          <button 
-            onClick={() => setShowTagManager(true)} 
-            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
-          >
-            🏷️ Tags
-          </button>
         </div>
 
         <div className={`flex justify-between items-center mb-4 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
