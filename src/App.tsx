@@ -490,12 +490,44 @@ function App() {
     const before = text.substring(0, start);
     const after = text.substring(end);
 
-    const wrapped = `${wrapper}${selected}${wrapper}`;
-    setText(before + wrapped + after);
+    // Check if the selected text is already wrapped with the formatting
+    const isAlreadyWrapped = selected.startsWith(wrapper) && selected.endsWith(wrapper) && selected.length > wrapper.length * 2;
+    
+    // Check if the text around the selection has the formatting
+    const expandedBefore = text.substring(Math.max(0, start - wrapper.length), start);
+    const expandedAfter = text.substring(end, Math.min(text.length, end + wrapper.length));
+    const isWrappedByContext = expandedBefore === wrapper && expandedAfter === wrapper;
+    
+    let newText: string;
+    let newStart: number;
+    let newEnd: number;
+
+    if (isAlreadyWrapped) {
+      // Remove formatting from selected text
+      const unwrapped = selected.substring(wrapper.length, selected.length - wrapper.length);
+      newText = before + unwrapped + after;
+      newStart = start;
+      newEnd = start + unwrapped.length;
+    } else if (isWrappedByContext) {
+      // Remove formatting from around the selection
+      const beforeWithoutWrapper = text.substring(0, start - wrapper.length);
+      const afterWithoutWrapper = text.substring(end + wrapper.length);
+      newText = beforeWithoutWrapper + selected + afterWithoutWrapper;
+      newStart = start - wrapper.length;
+      newEnd = end - wrapper.length;
+    } else {
+      // Add formatting
+      const wrapped = `${wrapper}${selected}${wrapper}`;
+      newText = before + wrapped + after;
+      newStart = start + wrapper.length;
+      newEnd = end + wrapper.length;
+    }
+
+    setText(newText);
 
     setTimeout(() => {
       textarea.focus();
-      textarea.setSelectionRange(start + wrapper.length, end + wrapper.length);
+      textarea.setSelectionRange(newStart, newEnd);
     }, 0);
   };
 
