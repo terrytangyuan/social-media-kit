@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [Unreleased]
+
+### 🏷️ New Features
+
+#### Unified Tagging System
+- **Cross-Platform Tagging**: Introduced `@{Person Name}` syntax for unified tagging across all platforms
+- **Smart Platform Conversion**: Automatically converts unified tags to platform-specific formats:
+  - LinkedIn: Uses display name format (e.g., `@Yuan Tang`) with manual tagging required
+  - Twitter/X: Uses username format (e.g., `@TerryTangYuan`) for automatic clickable mentions
+  - Bluesky: Uses handle format (e.g., `@terrytangyuan.xyz`) for automatic clickable mentions
+- **Person Management System**: Complete CRUD operations for person mappings
+  - Add new person mappings with name, display name, and platform-specific handles
+  - Edit existing person mappings with inline editing interface
+  - Delete person mappings with confirmation prompts
+- **Tag Manager UI**: Dedicated interface for managing person mappings
+  - Visual tagging guide with examples for each platform
+  - Easy insertion of unified tags into posts
+  - Clear instructions and help text for LinkedIn's manual tagging requirements
+- **Persistent Storage**: All person mappings automatically saved to localStorage
+
+### 🔧 Technical Improvements
+
+#### Frontend (src/App.tsx)
+- Added unified tagging processing with `processUnifiedTags()` function
+- Implemented person mapping management with add/edit/delete operations
+- Enhanced form validation and user feedback for person mappings
+- Added LinkedIn-specific tagging instructions and help text
+- Simplified LinkedIn tagging logic (removed LinkedIn field dependency)
+
+#### User Experience
+- Added helpful notes explaining LinkedIn's manual tagging requirements
+- Improved form labels and placeholder text for clarity
+- Enhanced visual feedback for person mapping operations
+- Added platform-specific tagging examples in the UI
+
 ## [0.2.0]
 
 ### 🎉 Major Release - All Authentication & Posting Issues Resolved

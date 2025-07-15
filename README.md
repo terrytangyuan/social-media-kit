@@ -44,6 +44,17 @@ A comprehensive social media management tool designed to help you create, format
 - **Auto-Save**: Drafts automatically saved to localStorage
 - **Post Counter**: Visual indicator of total saved posts
 
+### 🏷️ **Unified Tagging System**
+- **Cross-Platform Tagging**: Use `@{Person Name}` syntax to tag people across all platforms
+- **Smart Platform Conversion**: Automatically converts to platform-specific formats:
+  - LinkedIn: `@Display Name` (manual tagging required after pasting)
+  - Twitter/X: `@username` (automatic clickable mentions)
+  - Bluesky: `@handle.domain` (automatic clickable mentions)
+- **Person Management**: Add, edit, and delete person mappings with platform-specific handles
+- **Inline Editing**: Edit existing person mappings directly in the tag manager
+- **Visual Tagging Guide**: Clear instructions and examples for each platform
+- **Persistent Storage**: All person mappings saved to localStorage
+
 ### ⏰ **Scheduling & Reminders**
 - **Date/Time Picker**: Set reminders for when to post
 - **32+ Timezone Support**: Global timezone selections
@@ -160,7 +171,21 @@ The built files will be in the `dist` directory.
 - **Copy Option**: Use "📋 Copy for [Platform]" if you prefer manual posting
 - **Thread Handling**: Long posts are automatically split into threads
 
-### **5. Managing Multiple Posts**
+### **5. Using Unified Tagging**
+- Click **🏷️ Tags** to open the Tag Manager
+- **Add Person**: Create person mappings with name and platform-specific handles
+  - **Name**: Used for tagging syntax (e.g., "Yuan Tang")
+  - **Display Name**: What appears in posts (e.g., "Yuan Tang")
+  - **X/Twitter**: Username handle (e.g., "TerryTangYuan")
+  - **Bluesky**: Handle with domain (e.g., "terrytangyuan.xyz")
+- **Tag in Posts**: Use `@{Person Name}` syntax in your posts
+- **Platform Conversion**: Automatically converts to platform-specific formats:
+  - LinkedIn: `@Yuan Tang` (requires manual @ selection after pasting)
+  - Twitter/X: `@TerryTangYuan` (automatic clickable mention)
+  - Bluesky: `@terrytangyuan.xyz` (automatic clickable mention)
+- **Edit/Delete**: Use the ✏️ Edit and 🗑️ Delete buttons to manage mappings
+
+### **6. Managing Multiple Posts**
 - Click **📝 Posts** to access the post manager
 - **Create**: Use "➕ New Post" to create additional posts
 - **Switch**: Click any post to switch to editing it
@@ -212,13 +237,15 @@ Chunking intelligently breaks at:
 ## 🌟 Tips for Best Results
 
 1. **Authentication First**: Set up your OAuth credentials in Settings before posting
-2. **Use Formatting Wisely**: Bold text draws attention - use sparingly for key points
-3. **Emoji Enhancement**: Use relevant emojis to make posts more engaging and visual
-4. **Platform Optimization**: Tailor content length and style to each platform's audience
-5. **Test Posting**: Verify authentication and test with short posts first
-6. **Schedule Strategically**: Set reminders for optimal posting times for your audience
-7. **Backup Posts**: Regularly export your posts to avoid losing content
-8. **Preview Before Posting**: Always review the formatted preview before publishing
+2. **Use Unified Tagging**: Create person mappings in the Tag Manager, then use `@{Person Name}` to tag people across all platforms
+3. **LinkedIn Tagging**: After pasting posts with unified tags, manually type `@` in LinkedIn and select the person from the dropdown
+4. **Use Formatting Wisely**: Bold text draws attention - use sparingly for key points
+5. **Emoji Enhancement**: Use relevant emojis to make posts more engaging and visual
+6. **Platform Optimization**: Tailor content length and style to each platform's audience
+7. **Test Posting**: Verify authentication and test with short posts first
+8. **Schedule Strategically**: Set reminders for optimal posting times for your audience
+9. **Backup Posts**: Regularly export your posts to avoid losing content
+10. **Preview Before Posting**: Always review the formatted preview before publishing
 
 ## 🐛 Troubleshooting
 
