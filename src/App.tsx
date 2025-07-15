@@ -1130,14 +1130,38 @@ function App() {
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Twitter API error: ${errorData.error || response.statusText}`);
+      let errorMessage = `Twitter API error (${response.status})`;
+      try {
+        const errorData = await response.json();
+        console.error('Twitter API error details:', errorData);
+        
+        // Handle specific Twitter error cases
+        if (response.status === 403) {
+          if (errorData.detail?.includes('not permitted')) {
+            errorMessage = `Twitter API error: You are not permitted to perform this action. This might be due to:\n• Rate limiting (posting too frequently)\n• API permission issues\n• Account restrictions\n\nTry waiting a few minutes before posting again.`;
+          } else {
+            errorMessage = `Twitter API error (403 Forbidden): ${errorData.detail || errorData.error || 'Permission denied'}`;
+          }
+        } else if (response.status === 429) {
+          errorMessage = `Twitter API error: Rate limit exceeded. Please wait before posting again.`;
+        } else if (response.status === 401) {
+          errorMessage = `Twitter API error: Authentication failed. Please reconnect your Twitter account.`;
+        } else {
+          errorMessage = `Twitter API error (${response.status}): ${errorData.detail || errorData.error || errorData.message || response.statusText}`;
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Twitter error response:', parseError);
+        const errorText = await response.text();
+        errorMessage = `Twitter API error (${response.status}): ${errorText || response.statusText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
     
     return response.json();
   };
 
-  const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string) => {
+  const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string, rootUri?: string, rootCid?: string) => {
     const authData = auth.bluesky;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Bluesky');
@@ -1152,12 +1176,12 @@ function App() {
     if (replyToUri && replyToCid) {
       record.reply = {
         root: {
-          uri: replyToUri,
-          cid: replyToCid
+          uri: rootUri || replyToUri,   // Use root if available, otherwise parent
+          cid: rootCid || replyToCid    // Use root if available, otherwise parent
         },
         parent: {
-          uri: replyToUri,
-          cid: replyToCid
+          uri: replyToUri,              // Always points to immediate parent
+          cid: replyToCid               // Always points to immediate parent
         }
       };
     }
@@ -1176,7 +1200,31 @@ function App() {
     });
     
     if (!response.ok) {
-      throw new Error(`Bluesky API error: ${response.statusText}`);
+      let errorMessage = `Bluesky API error (${response.status})`;
+      try {
+        const errorData = await response.json();
+        console.error('Bluesky API error details:', errorData);
+        
+        // Handle specific Bluesky error cases
+        if (response.status === 401) {
+          errorMessage = `Bluesky API error: Authentication failed. Your session may have expired. Please reconnect your Bluesky account.`;
+        } else if (response.status === 403) {
+          errorMessage = `Bluesky API error: Permission denied. This might be due to:\n• Account restrictions\n• Invalid app password\n• Server policy violations`;
+        } else if (response.status === 429) {
+          errorMessage = `Bluesky API error: Rate limit exceeded. Please wait before posting again.`;
+        } else if (response.status === 400) {
+          const details = errorData.message || errorData.error || 'Invalid request';
+          errorMessage = `Bluesky API error: ${details}`;
+        } else {
+          errorMessage = `Bluesky API error (${response.status}): ${errorData.message || errorData.error || response.statusText}`;
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Bluesky error response:', parseError);
+        const errorText = await response.text();
+        errorMessage = `Bluesky API error (${response.status}): ${errorText || response.statusText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
     
     return response.json();
@@ -1194,14 +1242,19 @@ function App() {
       setIsPosting(true);
       setPostingStatus(`Posting to ${selectedPlatform}...`);
       
-      const chunks = chunkText(text, selectedPlatform);
-      const formattedChunks = chunks.map(chunk => formatForPlatform(chunk, selectedPlatform));
+      // Format text first, then chunk to ensure accurate character counts
+      const formattedText = formatForPlatform(text, selectedPlatform);
+      const chunks = chunkText(formattedText, selectedPlatform);
+      const formattedChunks = chunks;
       
       let results = [];
       
       let previousPostId: string | undefined;
       let previousPostUri: string | undefined;
       let previousPostCid: string | undefined;
+      // Track root post for Bluesky threading
+      let rootPostUri: string | undefined;
+      let rootPostCid: string | undefined;
       
       for (let i = 0; i < formattedChunks.length; i++) {
         const chunk = formattedChunks[i];
@@ -1220,9 +1273,14 @@ function App() {
             }
             break;
           case 'bluesky':
-            result = await postToBluesky(chunk, previousPostUri, previousPostCid);
+            result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid);
             // Extract URI and CID for next reply
             if (result?.uri && result?.cid) {
+              // Set root on first post
+              if (i === 0) {
+                rootPostUri = result.uri;
+                rootPostCid = result.cid;
+              }
               previousPostUri = result.uri;
               previousPostCid = result.cid;
             }
@@ -1233,9 +1291,11 @@ function App() {
         
         results.push(result);
         
-        // Add delay between posts for multi-part content
+        // Add delay between posts for multi-part content (increased for Twitter rate limiting)
         if (i < formattedChunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          const delay = selectedPlatform === 'twitter' ? 5000 : 2000; // 5 seconds for Twitter, 2 for others
+          setPostingStatus(`Waiting ${delay/1000} seconds before posting next part...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
       
@@ -1284,12 +1344,17 @@ function App() {
         try {
           setPostingStatus(`Posting to ${platformNames[platform]}...`);
           
-          const chunks = chunkText(text, platform);
-          const formattedChunks = chunks.map(chunk => formatForPlatform(chunk, platform));
+          // Format text first, then chunk to ensure accurate character counts
+          const formattedText = formatForPlatform(text, platform);
+          const chunks = chunkText(formattedText, platform);
+          const formattedChunks = chunks;
           
           let previousPostId: string | undefined;
           let previousPostUri: string | undefined;
           let previousPostCid: string | undefined;
+          // Track root post for Bluesky threading
+          let rootPostUri: string | undefined;
+          let rootPostCid: string | undefined;
           
           for (let i = 0; i < formattedChunks.length; i++) {
             const chunk = formattedChunks[i];
@@ -1308,26 +1373,35 @@ function App() {
                 }
                 break;
               case 'bluesky':
-                result = await postToBluesky(chunk, previousPostUri, previousPostCid);
+                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid);
                 // Extract URI and CID for next reply
                 if (result?.uri && result?.cid) {
+                  // Set root on first post
+                  if (i === 0) {
+                    rootPostUri = result.uri;
+                    rootPostCid = result.cid;
+                  }
                   previousPostUri = result.uri;
                   previousPostCid = result.cid;
                 }
                 break;
             }
             
-            // Add delay between posts for multi-part content
+            // Add delay between posts for multi-part content (increased for Twitter)
             if (i < formattedChunks.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              const delay = platform === 'twitter' ? 5000 : 2000; // 5 seconds for Twitter, 2 for others
+              setPostingStatus(`Waiting ${delay/1000} seconds before posting next part to ${platformNames[platform]}...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
           
           results.push({ platform: platformNames[platform], success: true });
           
-          // Add delay between platforms
+          // Add delay between platforms (longer if Twitter was just used)
           if (connectedPlatforms.indexOf(platform) < connectedPlatforms.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const delay = platform === 'twitter' ? 3000 : 1000; // 3 seconds after Twitter, 1 second after others
+            setPostingStatus(`Waiting ${delay/1000} seconds before posting to next platform...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
           
         } catch (error) {
@@ -1393,49 +1467,71 @@ function App() {
         break;
       }
       
-      // Try to break at natural points
-      let breakPoint = limit;
+      // Find the best break point within the limit
+      let breakPoint = findBestBreakPoint(remainingText, limit);
       
-      // Look for sentence ending
-      const sentenceEnd = remainingText.lastIndexOf('.', limit);
-      const questionEnd = remainingText.lastIndexOf('?', limit);
-      const exclamationEnd = remainingText.lastIndexOf('!', limit);
+      // Extract chunk and clean up
+      let chunk = remainingText.substring(0, breakPoint).replace(/\s+$/, ''); // Remove trailing whitespace
       
-      const sentenceBreak = Math.max(sentenceEnd, questionEnd, exclamationEnd);
-      
-      if (sentenceBreak > limit * 0.7) {
-        breakPoint = sentenceBreak + 1;
-      } else {
-              // Look for paragraph break
-      const paragraphBreak = remainingText.lastIndexOf('\n\n', limit);
-      if (paragraphBreak > limit * 0.5) {
-        breakPoint = paragraphBreak + 2; // Include the paragraph break in the first chunk
-      } else {
-        // Look for single line break
-        const lineBreak = remainingText.lastIndexOf('\n', limit);
-        if (lineBreak > limit * 0.7) {
-          breakPoint = lineBreak + 1; // Include the line break in the first chunk
-        } else {
-          // Look for word boundary
-          const spaceBreak = remainingText.lastIndexOf(' ', limit);
-          if (spaceBreak > limit * 0.8) {
-            breakPoint = spaceBreak + 1; // Include the space in the first chunk
-          }
+      // Ensure chunk doesn't exceed limit after cleanup
+      if (chunk.length > limit) {
+        // If still too long, force break at a safe point
+        chunk = remainingText.substring(0, limit).replace(/\s+$/, '');
+        // Find last space before limit to avoid breaking words if possible
+        const lastSpace = chunk.lastIndexOf(' ');
+        if (lastSpace > limit * 0.8) {
+          chunk = chunk.substring(0, lastSpace);
         }
       }
-      }
       
-      // Preserve indentation by only trimming trailing whitespace
-      const chunk = remainingText.substring(0, breakPoint);
-      chunks.push(chunk.replace(/\s+$/, '')); // Only remove trailing whitespace
+      chunks.push(chunk);
       
-      // For remaining text, preserve leading whitespace structure
-      remainingText = remainingText.substring(breakPoint);
-      // Only remove excessive leading blank lines, but preserve indentation
-      remainingText = remainingText.replace(/^\n+/, ''); // Remove leading newlines but preserve indentation
+      // Remove processed text and clean up leading whitespace
+      remainingText = remainingText.substring(chunk.length).replace(/^\s+/, '');
     }
     
-    return chunks;
+    // Final safety check: ensure no chunk exceeds limit
+    return chunks.map(chunk => {
+      if (chunk.length > limit) {
+        console.warn(`Chunk exceeds ${platform} limit (${chunk.length}/${limit}):`, chunk.substring(0, 50) + '...');
+        // Force truncate if somehow still too long
+        return chunk.substring(0, limit - 3) + '...';
+      }
+      return chunk;
+    }).filter(chunk => chunk.length > 0);
+  };
+
+  // Helper function to find the best break point within the character limit
+  const findBestBreakPoint = (text: string, limit: number): number => {
+    // Look for sentence endings first (priority)
+    const sentenceMarkers = ['. ', '? ', '! '];
+    for (const marker of sentenceMarkers) {
+      const pos = text.lastIndexOf(marker, limit - marker.length);
+      if (pos > limit * 0.6) { // Only use if reasonably close to limit
+        return pos + marker.length;
+      }
+    }
+    
+    // Look for paragraph breaks
+    const paragraphBreak = text.lastIndexOf('\n\n', limit - 2);
+    if (paragraphBreak > limit * 0.4) {
+      return paragraphBreak + 2;
+    }
+    
+    // Look for line breaks
+    const lineBreak = text.lastIndexOf('\n', limit - 1);
+    if (lineBreak > limit * 0.6) {
+      return lineBreak + 1;
+    }
+    
+    // Look for word boundaries (spaces)
+    const spaceBreak = text.lastIndexOf(' ', limit - 1);
+    if (spaceBreak > limit * 0.7) {
+      return spaceBreak + 1;
+    }
+    
+    // If no good break point found, use the limit (will be handled by caller)
+    return limit;
   };
 
   const formatForPlatform = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
@@ -1482,10 +1578,10 @@ function App() {
 
   const handleCopyStyled = async () => {
     try {
-      const chunks = chunkText(text, selectedPlatform);
-      const formattedChunks = chunks.map((chunk) => {
-        return formatForPlatform(chunk, selectedPlatform);
-      });
+      // Format text first, then chunk to ensure accurate character counts
+      const formattedText = formatForPlatform(text, selectedPlatform);
+      const chunks = chunkText(formattedText, selectedPlatform);
+      const formattedChunks = chunks;
       
       const finalText = formattedChunks.join('\n\n---\n\n');
       
@@ -2415,10 +2511,10 @@ function App() {
               </div>
             )}
             {(() => {
-              const chunks = chunkText(text, selectedPlatform);
-              const formattedChunks = chunks.map((chunk) => {
-                return formatForPlatform(chunk, selectedPlatform);
-              });
+              // Format text first, then chunk to ensure accurate character counts
+              const formattedText = formatForPlatform(text, selectedPlatform);
+              const chunks = chunkText(formattedText, selectedPlatform);
+              const formattedChunks = chunks;
               
               return (
                 <div className="space-y-4">
