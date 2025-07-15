@@ -1268,8 +1268,8 @@ function App() {
           case 'twitter':
             result = await postToTwitter(chunk, previousPostId);
             // Extract tweet ID for next reply
-            if (result?.data?.id) {
-              previousPostId = result.data.id;
+            if (result?.data?.data?.id) {
+              previousPostId = result.data.data.id;
             }
             break;
           case 'bluesky':
@@ -1368,8 +1368,8 @@ function App() {
               case 'twitter':
                 result = await postToTwitter(chunk, previousPostId);
                 // Extract tweet ID for next reply
-                if (result?.data?.id) {
-                  previousPostId = result.data.id;
+                if (result?.data?.data?.id) {
+                  previousPostId = result.data.data.id;
                 }
                 break;
               case 'bluesky':

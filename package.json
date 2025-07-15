@@ -1,14 +1,16 @@
 {
   "name": "social-media-kit",
+  "private": true,
   "version": "0.2.0",
   "description": "A comprehensive social media kit for creating, formatting, and posting content across LinkedIn, Twitter/X, and Bluesky platforms",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "node --env-file=.env server.js",
-    "start": "npm run build && npm run server"
+    "kill-port": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true",
+    "start": "npm run kill-port && npm run build && npm run server"
   },
   "dependencies": {
     "cors": "^2.8.5",

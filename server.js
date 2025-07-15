@@ -330,7 +330,7 @@ app.post('/api/twitter/post', async (req, res) => {
       return res.status(400).json({ error: 'Content and access token are required' });
     }
     
-    console.log('📤 Posting to Twitter via server...');
+
     
     const tweetData = {
       text: content
@@ -364,8 +364,6 @@ app.post('/api/twitter/post', async (req, res) => {
     }
     
     const result = await response.json();
-    console.log('✅ Twitter post successful:', result);
-    
     res.json({ success: true, data: result });
     
   } catch (error) {
