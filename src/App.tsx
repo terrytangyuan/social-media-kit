@@ -1357,27 +1357,33 @@ function App() {
       if (sentenceBreak > limit * 0.7) {
         breakPoint = sentenceBreak + 1;
       } else {
-        // Look for paragraph break
-        const paragraphBreak = remainingText.lastIndexOf('\n\n', limit);
-        if (paragraphBreak > limit * 0.5) {
-          breakPoint = paragraphBreak;
+              // Look for paragraph break
+      const paragraphBreak = remainingText.lastIndexOf('\n\n', limit);
+      if (paragraphBreak > limit * 0.5) {
+        breakPoint = paragraphBreak + 2; // Include the paragraph break in the first chunk
+      } else {
+        // Look for single line break
+        const lineBreak = remainingText.lastIndexOf('\n', limit);
+        if (lineBreak > limit * 0.7) {
+          breakPoint = lineBreak + 1; // Include the line break in the first chunk
         } else {
-          // Look for single line break
-          const lineBreak = remainingText.lastIndexOf('\n', limit);
-          if (lineBreak > limit * 0.7) {
-            breakPoint = lineBreak;
-          } else {
-            // Look for word boundary
-            const spaceBreak = remainingText.lastIndexOf(' ', limit);
-            if (spaceBreak > limit * 0.8) {
-              breakPoint = spaceBreak;
-            }
+          // Look for word boundary
+          const spaceBreak = remainingText.lastIndexOf(' ', limit);
+          if (spaceBreak > limit * 0.8) {
+            breakPoint = spaceBreak + 1; // Include the space in the first chunk
           }
         }
       }
+      }
       
-      chunks.push(remainingText.substring(0, breakPoint).trim());
-      remainingText = remainingText.substring(breakPoint).trim();
+      // Preserve indentation by only trimming trailing whitespace
+      const chunk = remainingText.substring(0, breakPoint);
+      chunks.push(chunk.replace(/\s+$/, '')); // Only remove trailing whitespace
+      
+      // For remaining text, preserve leading whitespace structure
+      remainingText = remainingText.substring(breakPoint);
+      // Only remove excessive leading blank lines, but preserve indentation
+      remainingText = remainingText.replace(/^\n+/, ''); // Remove leading newlines but preserve indentation
     }
     
     return chunks;
