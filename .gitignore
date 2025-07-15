@@ -168,3 +168,7 @@ coverage/
 # (uncomment if you have custom Tailwind builds)
 # tailwind.config.js
 # postcss.config.js .env
+
+# Compiled TypeScript files in src (should not be committed)
+src/**/*.js
+src/**/*.js.map
