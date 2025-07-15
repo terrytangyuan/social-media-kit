@@ -20,76 +20,16 @@ textarea::placeholder {
   color: #6b7280; /* gray-500 */
 }
 
-/* Resize handle styling */
+/* Simple, clean textarea resize styling */
 textarea[class*="resize-y"] {
   resize: vertical;
   overflow: auto;
+  cursor: text;
 }
 
-/* Make resize handle more visible */
-textarea[class*="resize-y"]::-webkit-resizer {
-  background: linear-gradient(-45deg, transparent 0%, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%);
-  opacity: 0.3;
-}
-
-textarea[class*="resize-y"]:hover::-webkit-resizer {
-  opacity: 0.6;
-}
-
-/* Ensure resize handle is visible in dark mode */
-.dark-textarea::-webkit-resizer {
-  background: linear-gradient(-45deg, transparent 0%, transparent 40%, #9ca3af 40%, #9ca3af 60%, transparent 60%);
-  opacity: 0.5;
-}
-
-.dark-textarea:hover::-webkit-resizer {
-  opacity: 0.8;
-}
-
-/* Enhanced resize handle visibility */
-textarea[class*="resize-y"] {
-  resize: vertical;
-  overflow: auto;
-  /* Force the resize handle to be visible */
-  background: 
-    radial-gradient(circle at bottom right, currentColor 2px, transparent 2px),
-    radial-gradient(circle at bottom right, currentColor 1px, transparent 1px);
-  background-size: 8px 8px, 4px 4px;
-  background-position: bottom right, bottom right;
-  background-repeat: no-repeat;
-}
-
-/* Better resize handle for light mode */
-.light-textarea {
-  background: 
-    radial-gradient(circle at bottom right, #6b7280 2px, transparent 2px),
-    radial-gradient(circle at bottom right, #6b7280 1px, transparent 1px);
-  background-size: 8px 8px, 4px 4px;
-  background-position: bottom right, bottom right;
-  background-repeat: no-repeat;
-}
-
-/* Better resize handle for dark mode */
-.dark-textarea {
-  background: 
-    radial-gradient(circle at bottom right, #9ca3af 2px, transparent 2px),
-    radial-gradient(circle at bottom right, #9ca3af 1px, transparent 1px);
-  background-size: 8px 8px, 4px 4px;
-  background-position: bottom right, bottom right;
-  background-repeat: no-repeat;
-}
-
-/* Ensure resize cursor is only visible on the resize handle area */
-textarea[class*="resize-y"] {
-  cursor: text; /* Default cursor for textarea */
-}
-
-/* Only show resize cursor on the actual resize handle area (bottom right corner) */
+/* Ensure textarea maintains text cursor */
+textarea[class*="resize-y"]:focus,
+textarea[class*="resize-y"]:active,
 textarea[class*="resize-y"]:hover {
-  cursor: text; /* Keep text cursor for main area */
-}
-
-/* Target the resize handle area specifically */
-textarea[class*="resize-y"]::-webkit-resizer {
-  cursor: nw-resize;
+  cursor: text;
 }
