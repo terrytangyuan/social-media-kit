@@ -13,14 +13,26 @@ Features advanced styling, tagging, reminder, OAuth authentication, and cross-pl
 More screenshots can be found in [this folder](/screenshots).
 
 
-## 🚀 Features
+## 🚀 Key Features
+
+- **🌐 Multi-Platform Support** - Post to LinkedIn, Twitter/X, and Bluesky with OAuth authentication
+- **✨ Advanced Formatting** - Bold (`**text**`) and italic (`_text_`) with Unicode styling
+- **🏷️ Unified Tagging** - Use `@{Person Name}` syntax for cross-platform tagging
+- **📝 Post Management** - Create, edit, and organize multiple posts with auto-save
+- **😊 Emoji Picker** - 6 categories with easy insertion at cursor position
+- **⏰ Scheduling & Reminders** - Set posting reminders with timezone support
+- **🎨 Dark Mode** - Toggle between light/dark themes with persistence
+- **📱 Direct Posting** - One-click posting with automatic thread creation
+
+<details>
+<summary><strong>📋 Detailed Features</strong></summary>
 
 ### 🌐 **Multi-Platform Support**
-- **LinkedIn**: Full OAuth 2.0 integration with direct posting (3,000 character limit)
+- **LinkedIn**: OAuth 2.0 integration with direct posting (3,000 character limit)
 - **Twitter/X**: OAuth 2.0 authentication with automatic thread creation (280 character limit)
 - **Bluesky**: App password authentication with native posting (300 character limit)
-- **Platform Switching**: Easy platform selection with visual authentication status indicators
 - **Smart Chunking**: Automatic text splitting based on platform-specific character limits
+- **Visual Status**: Green checkmarks (✓) show authentication status for each platform
 
 ### ✨ **Advanced Text Formatting**
 - **Bold Text**: Use `**text**` to create Unicode bold formatting (𝗯𝗼𝗹𝗱)
@@ -28,25 +40,6 @@ More screenshots can be found in [this folder](/screenshots).
 - **Cross-Platform Compatible**: Unicode characters work across all supported platforms
 - **Live Preview**: Real-time preview of formatted text as you type
 - **Intelligent Text Breaking**: Smart chunking at sentence and paragraph boundaries
-
-### 🔐 **OAuth & Authentication**
-- **Settings UI**: Built-in OAuth configuration panel with step-by-step instructions
-- **LinkedIn OAuth**: OAuth 2.0 with `w_member_social` scope for posting
-- **Twitter OAuth**: OAuth 2.0 with `tweet.read`, `tweet.write`, `users.read` scopes
-- **Bluesky Authentication**: Secure app password system
-- **Token Management**: Automatic token storage, persistence, and refresh handling
-- **Visual Status**: Green checkmarks (✓) show authentication status for each platform
-
-### 😊 **Comprehensive Emoji Picker**
-- **6 Categories with Grid Layout**: Organized 8-column grid for easy browsing
-- **Easy Insertion**: Click any emoji to insert at cursor position
-
-### 📝 **Post Management System**
-- **Create & Edit**: Multiple posts with custom titles and content
-- **Save & Load**: Export/import posts to/from JSON files
-- **Post Switching**: Easy navigation between saved posts
-- **Auto-Save**: Drafts automatically saved to localStorage
-- **Post Counter**: Visual indicator of total saved posts
 
 ### 🏷️ **Unified Tagging System**
 - **Cross-Platform Tagging**: Use `@{Person Name}` syntax to tag people across all platforms
@@ -58,6 +51,20 @@ More screenshots can be found in [this folder](/screenshots).
 - **Inline Editing**: Edit existing person mappings directly in the tag manager
 - **Visual Tagging Guide**: Clear instructions and examples for each platform
 - **Persistent Storage**: All person mappings saved to localStorage
+
+### 🔐 **OAuth & Authentication**
+- **Settings UI**: Built-in OAuth configuration panel with step-by-step instructions
+- **LinkedIn OAuth**: OAuth 2.0 with `w_member_social` scope for posting
+- **Twitter OAuth**: OAuth 2.0 with `tweet.read`, `tweet.write`, `users.read` scopes
+- **Bluesky Authentication**: Secure app password system
+- **Token Management**: Automatic token storage, persistence, and refresh handling
+
+### 📝 **Post Management System**
+- **Create & Edit**: Multiple posts with custom titles and content
+- **Save & Load**: Export/import posts to/from JSON files
+- **Post Switching**: Easy navigation between saved posts
+- **Auto-Save**: Drafts automatically saved to localStorage
+- **Post Counter**: Visual indicator of total saved posts
 
 ### ⏰ **Scheduling & Reminders**
 - **Date/Time Picker**: Set reminders for when to post
@@ -78,6 +85,8 @@ More screenshots can be found in [this folder](/screenshots).
 - **Posting Status**: Real-time feedback during posting process
 - **Error Handling**: Clear error messages and retry options
 - **Sequential Posting**: Automatic delays between multi-part posts
+
+</details>
 
 ## 🛠️ Tech Stack
 
@@ -146,7 +155,15 @@ npm run build
 
 The built files will be in the `dist` directory.
 
-## 🎯 How to Use
+## 🎯 Quick Start
+
+1. **⚙️ Setup OAuth** - Configure LinkedIn/Twitter client IDs or Bluesky app password
+2. **✍️ Write Posts** - Use `**bold**`, `_italic_`, and `@{Person Name}` for tagging
+3. **🎯 Select Platform** - Choose LinkedIn, Twitter/X, or Bluesky
+4. **📤 Post** - Click "Post to [Platform]" or copy for manual posting
+
+<details>
+<summary><strong>📖 Detailed Usage Guide</strong></summary>
 
 ### **1. Setting Up Authentication**
 1. Click the **⚙️ Settings** button in the top header
@@ -196,6 +213,8 @@ The built files will be in the `dist` directory.
 - **Export/Import**: Use "💾 Save" and "📁 Load" to backup/restore posts
 - **Organize**: Edit post titles by clicking on them
 
+</details>
+
 ### **6. Scheduling Reminders**
 - Use the "Schedule Post Reminder" datetime picker
 - Select your timezone from 32+ global options
@@ -207,7 +226,10 @@ The built files will be in the `dist` directory.
 - All interface elements adapt to your chosen theme
 - Your preference is automatically saved
 
-## 🔧 Features in Detail
+</details>
+
+<details>
+<summary><strong>🔧 Technical Details</strong></summary>
 
 ### **Unicode Text Formatting**
 The app converts markdown syntax to Unicode characters that work across all platforms:
@@ -238,50 +260,29 @@ Chunking intelligently breaks at:
 - **Twitter/X**: 280 characters (concise microblogging)
 - **Bluesky**: 300 characters (short-form social content)
 
-## 🌟 Tips for Best Results
+</details>
 
-1. **Authentication First**: Set up your OAuth credentials in Settings before posting
-2. **Use Unified Tagging**: Create person mappings in the Tag Manager, then use `@{Person Name}` to tag people across all platforms
-3. **LinkedIn Tagging**: After pasting posts with unified tags, manually type `@` in LinkedIn and select the person from the dropdown
-4. **Use Formatting Wisely**: Bold text draws attention - use sparingly for key points
-5. **Emoji Enhancement**: Use relevant emojis to make posts more engaging and visual
-6. **Platform Optimization**: Tailor content length and style to each platform's audience
-7. **Test Posting**: Verify authentication and test with short posts first
-8. **Schedule Strategically**: Set reminders for optimal posting times for your audience
-9. **Backup Posts**: Regularly export your posts to avoid losing content
-10. **Preview Before Posting**: Always review the formatted preview before publishing
+## 🌟 Pro Tips
 
-## 🐛 Troubleshooting
+- **⚙️ Setup First** - Configure OAuth credentials before posting
+- **🏷️ Use Unified Tagging** - Create person mappings, then use `@{Person Name}` syntax
+- **💼 LinkedIn Tagging** - After pasting, manually type `@` and select from dropdown
+- **✨ Format Wisely** - Use bold text sparingly for key points
+- **📋 Always Preview** - Review formatted content before publishing
 
-### **Authentication Issues**
-- **"CLIENT ID NOT CONFIGURED"**: Add your client ID to `.env` file and restart server
-- **OAuth redirect fails**: Verify redirect URLs match exactly (`http://localhost:3000`)
-- **Token expired**: Re-authenticate by clicking "Login" again
-- **LinkedIn 403 errors**: Ensure required products are enabled in LinkedIn Developer Portal
-- **Twitter auth errors**: Verify app type is "Web App" (not "Confidential Client")
+## 🐛 Common Issues
 
-### **Posting Problems**
-- **API errors**: Check your API permissions and rate limits in developer portals
-- **Network issues**: Verify internet connection and try again
-- **Platform downtime**: Check if the social media platform is experiencing issues
-- **Permission denied**: Verify your app has proper read/write permissions
+**Authentication Problems:**
+- **"CLIENT ID NOT CONFIGURED"** → Add credentials to `.env` file and restart server
+- **OAuth redirect fails** → Verify redirect URLs match exactly (`http://localhost:3000`)
+- **LinkedIn 403 errors** → Enable required products in LinkedIn Developer Portal
+- **Twitter auth errors** → Verify app type is "Web App" (not "Confidential Client")
 
-### **Server Issues**
-- **Port 3000 in use**: Kill existing processes with `sudo lsof -ti:3000 | xargs sudo kill -9`
-- **Environment variables not loading**: Ensure `.env` file exists and restart server
-- **Module not found**: Run `npm install` to install dependencies
-- **Build errors**: Try `npm run build` to rebuild the application
+**Server Issues:**
+- **Port 3000 in use** → Kill existing processes: `sudo lsof -ti:3000 | xargs sudo kill -9`
+- **Module not found** → Run `npm install` to install dependencies
 
-### **Browser Compatibility**
-- **Copy function not working**: Try the "🖱️ Select All Text" button for manual copy
-- **Notifications not working**: Check browser notification permissions
-- **Dark mode issues**: Refresh the page if theme doesn't apply completely
-
-### **Development vs Production**
-- **Local development**: Uses `http://localhost:3000` redirect URIs
-- **Production deployment**: Update redirect URIs to your production domain
-
-**📋 For detailed troubleshooting and recent fixes, see [CHANGELOG.md](CHANGELOG.md)**
+📋 **For detailed troubleshooting and recent fixes, see [CHANGELOG.md](CHANGELOG.md)**
 
 ## 📝 License
 
