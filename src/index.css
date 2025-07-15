@@ -19,3 +19,67 @@ textarea::placeholder {
 .light-textarea::placeholder {
   color: #6b7280; /* gray-500 */
 }
+
+/* Resize handle styling */
+textarea[class*="resize-y"] {
+  resize: vertical;
+  overflow: auto;
+}
+
+/* Make resize handle more visible */
+textarea[class*="resize-y"]::-webkit-resizer {
+  background: linear-gradient(-45deg, transparent 0%, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%);
+  opacity: 0.3;
+}
+
+textarea[class*="resize-y"]:hover::-webkit-resizer {
+  opacity: 0.6;
+}
+
+/* Ensure resize handle is visible in dark mode */
+.dark-textarea::-webkit-resizer {
+  background: linear-gradient(-45deg, transparent 0%, transparent 40%, #9ca3af 40%, #9ca3af 60%, transparent 60%);
+  opacity: 0.5;
+}
+
+.dark-textarea:hover::-webkit-resizer {
+  opacity: 0.8;
+}
+
+/* Enhanced resize handle visibility */
+textarea[class*="resize-y"] {
+  resize: vertical;
+  overflow: auto;
+  /* Force the resize handle to be visible */
+  background: 
+    radial-gradient(circle at bottom right, currentColor 2px, transparent 2px),
+    radial-gradient(circle at bottom right, currentColor 1px, transparent 1px);
+  background-size: 8px 8px, 4px 4px;
+  background-position: bottom right, bottom right;
+  background-repeat: no-repeat;
+}
+
+/* Better resize handle for light mode */
+.light-textarea {
+  background: 
+    radial-gradient(circle at bottom right, #6b7280 2px, transparent 2px),
+    radial-gradient(circle at bottom right, #6b7280 1px, transparent 1px);
+  background-size: 8px 8px, 4px 4px;
+  background-position: bottom right, bottom right;
+  background-repeat: no-repeat;
+}
+
+/* Better resize handle for dark mode */
+.dark-textarea {
+  background: 
+    radial-gradient(circle at bottom right, #9ca3af 2px, transparent 2px),
+    radial-gradient(circle at bottom right, #9ca3af 1px, transparent 1px);
+  background-size: 8px 8px, 4px 4px;
+  background-position: bottom right, bottom right;
+  background-repeat: no-repeat;
+}
+
+/* Ensure resize cursor is visible */
+textarea[class*="resize-y"]:hover {
+  cursor: ns-resize;
+}

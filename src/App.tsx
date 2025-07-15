@@ -2018,17 +2018,32 @@ function App() {
           </button>
         </div>
 
-        <textarea
-          ref={textareaRef}
-          className={`w-full h-40 p-4 border rounded-xl resize-none focus:outline-none focus:ring-2 mb-4 ${
-            darkMode 
-              ? "bg-gray-700 text-white border-gray-600 focus:ring-blue-500 dark-textarea" 
-              : "bg-white text-gray-800 border-gray-300 focus:ring-blue-400 light-textarea"
-          }`}
-          placeholder="Write your post here..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <div className="relative mb-4">
+          <textarea
+            ref={textareaRef}
+            className={`w-full min-h-40 p-4 border rounded-xl resize-y focus:outline-none focus:ring-2 ${
+              darkMode 
+                ? "bg-gray-700 text-white border-gray-600 focus:ring-blue-500 dark-textarea" 
+                : "bg-white text-gray-800 border-gray-300 focus:ring-blue-400 light-textarea"
+            }`}
+            placeholder="Write your post here..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          {/* Resize handle indicator */}
+          <div className={`absolute bottom-1 right-1 w-3 h-3 pointer-events-none opacity-30 ${
+            darkMode ? "text-gray-400" : "text-gray-500"
+          }`}>
+            <svg viewBox="0 0 12 12" className="w-full h-full">
+              <circle cx="2" cy="10" r="0.5" fill="currentColor"/>
+              <circle cx="6" cy="10" r="0.5" fill="currentColor"/>
+              <circle cx="10" cy="10" r="0.5" fill="currentColor"/>
+              <circle cx="6" cy="6" r="0.5" fill="currentColor"/>
+              <circle cx="10" cy="6" r="0.5" fill="currentColor"/>
+              <circle cx="10" cy="2" r="0.5" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>
 
         <div className="mb-4">
           <label className={`block mb-2 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
