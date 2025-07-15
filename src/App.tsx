@@ -1952,7 +1952,7 @@ function App() {
               ⭐ GitHub
             </button>
             <button
-              onClick={() => setShowOAuthSettings(!showOAuthSettings)}
+              onClick={() => setShowOAuthSettings(true)}
               className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
             >
               ⚙️ Settings
@@ -1966,149 +1966,154 @@ function App() {
           </div>
         </div>
 
+        {/* Settings Modal */}
         {showOAuthSettings && (
-          <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">⚙️ OAuth Settings</h2>
-              <button
-                onClick={() => setShowOAuthSettings(false)}
-                className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-gray-600 hover:bg-gray-500 text-white" : "bg-gray-300 hover:bg-gray-400 text-gray-700"}`}
-              >
-                ✕ Close
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
-                <h3 className="font-semibold mb-3">💼 LinkedIn</h3>
-                <div className="space-y-3">
-                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
-                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
-                    <ol className="text-xs space-y-1">
-                      <li>1. Go to <a href="https://www.linkedin.com/developers/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">LinkedIn Developer Portal</a></li>
-                      <li>2. Create a new app or select existing one</li>
-                      <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
-                      <li>4. Enable scope: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>w_member_social</code></li>
-                      <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>LINKEDIN_CLIENT_ID</code></li>
-                      <li>6. Restart the server to load the new configuration</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                      Client ID
-                    </label>
-                    <input
-                      type="text"
-                      value={oauthConfig.linkedin.clientId}
-                      onChange={(e) => updateOAuthConfig('linkedin', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
-                      placeholder="86abc123def456789"
-                      disabled={true}
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {oauthConfig.linkedin.clientId ? '✅ LinkedIn Client ID configured via .env file' : '⚠️ Client ID required - add LINKEDIN_CLIENT_ID to .env file'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
-                <h3 className="font-semibold mb-3">🐦 X/Twitter</h3>
-                <div className="space-y-3">
-                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
-                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
-                    <ol className="text-xs space-y-1">
-                      <li>1. Go to <a href="https://developer.twitter.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Twitter Developer Portal</a></li>
-                      <li>2. Create a new app or select existing one</li>
-                      <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
-                      <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
-                      <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>TWITTER_CLIENT_ID</code></li>
-                      <li>6. Restart the server to load the new configuration</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                      Client ID
-                    </label>
-                    <input
-                      type="text"
-                      value={oauthConfig.twitter.clientId}
-                      onChange={(e) => updateOAuthConfig('twitter', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
-                      placeholder="TwItTeRcLiEnTiD123456789"
-                      disabled={true}
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured via .env file' : '⚠️ Client ID required - add TWITTER_CLIENT_ID to .env file'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
-                <h3 className="font-semibold mb-3">🦋 Bluesky</h3>
-                <div className="space-y-3">
-                  <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
-                    <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
-                    <ol className="text-xs space-y-1">
-                      <li>1. Log into your Bluesky account</li>
-                      <li>2. Go to Settings → Privacy and Security → App Passwords</li>
-                      <li>3. Click "Add App Password" and name it (e.g., "Social Media Kit")</li>
-                      <li>4. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)</li>
-                      <li>5. When logging in, use your handle and the app password</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                      Server URL
-                    </label>
-                    <input
-                      type="text"
-                      value={oauthConfig.bluesky.server}
-                      onChange={(e) => updateBlueskyConfig(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
-                      placeholder="https://bsky.social"
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      💡 Usually https://bsky.social unless using a custom server
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 space-y-3">
-              <div className={`p-3 rounded-md ${darkMode ? "bg-green-900 text-green-100" : "bg-green-50 text-green-800"}`}>
-                <h4 className="font-medium text-sm mb-2">🚀 Next Steps:</h4>
-                <ol className="text-xs space-y-1">
-                  <li>1. Configure your Client IDs above</li>
-                  <li>2. Close this settings panel</li>
-                  <li>3. Select a platform and click "Login"</li>
-                  <li>4. Complete the OAuth flow</li>
-                  <li>5. Start posting with the "Post to [Platform]" button!</li>
-                </ol>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  💡 Client IDs are configured via .env file
-                </div>
-                <div className="flex gap-2">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-lg ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">⚙️ OAuth Settings</h2>
                   <button
-                    onClick={clearOAuthLocalStorage}
-                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-orange-500 hover:bg-orange-600 text-white"}`}
+                    onClick={() => setShowOAuthSettings(false)}
+                    className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                   >
-                    🧹 Clear Cache
+                    ✕
                   </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('Reset all OAuth settings to default?')) {
-                        setOauthConfig(DEFAULT_OAUTH_CONFIG);
-                      }
-                    }}
-                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
-                  >
-                    🔄 Reset to Default
-                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                    <h3 className="font-semibold mb-3">💼 LinkedIn</h3>
+                    <div className="space-y-3">
+                      <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                        <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                        <ol className="text-xs space-y-1">
+                          <li>1. Go to <a href="https://www.linkedin.com/developers/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">LinkedIn Developer Portal</a></li>
+                          <li>2. Create a new app or select existing one</li>
+                          <li>3. In Auth tab, add redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
+                          <li>4. Enable scope: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>w_member_social</code></li>
+                          <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>LINKEDIN_CLIENT_ID</code></li>
+                          <li>6. Restart the server to load the new configuration</li>
+                        </ol>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={oauthConfig.linkedin.clientId}
+                          onChange={(e) => updateOAuthConfig('linkedin', e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                          placeholder="86abc123def456789"
+                          disabled={true}
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {oauthConfig.linkedin.clientId ? '✅ LinkedIn Client ID configured via .env file' : '⚠️ Client ID required - add LINKEDIN_CLIENT_ID to .env file'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                    <h3 className="font-semibold mb-3">🐦 X/Twitter</h3>
+                    <div className="space-y-3">
+                      <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                        <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                        <ol className="text-xs space-y-1">
+                          <li>1. Go to <a href="https://developer.twitter.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Twitter Developer Portal</a></li>
+                          <li>2. Create a new app or select existing one</li>
+                          <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
+                          <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
+                          <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>TWITTER_CLIENT_ID</code></li>
+                          <li>6. Restart the server to load the new configuration</li>
+                        </ol>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={oauthConfig.twitter.clientId}
+                          onChange={(e) => updateOAuthConfig('twitter', e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                          placeholder="TwItTeRcLiEnTiD123456789"
+                          disabled={true}
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured via .env file' : '⚠️ Client ID required - add TWITTER_CLIENT_ID to .env file'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                    <h3 className="font-semibold mb-3">🦋 Bluesky</h3>
+                    <div className="space-y-3">
+                      <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                        <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                        <ol className="text-xs space-y-1">
+                          <li>1. Log into your Bluesky account</li>
+                          <li>2. Go to Settings → Privacy and Security → App Passwords</li>
+                          <li>3. Click "Add App Password" and name it (e.g., "Social Media Kit")</li>
+                          <li>4. Copy the generated password (format: xxxx-xxxx-xxxx-xxxx)</li>
+                          <li>5. When logging in, use your handle and the app password</li>
+                        </ol>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Server URL
+                        </label>
+                        <input
+                          type="text"
+                          value={oauthConfig.bluesky.server}
+                          onChange={(e) => updateBlueskyConfig(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                          placeholder="https://bsky.social"
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          💡 Usually https://bsky.social unless using a custom server
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 space-y-3">
+                  <div className={`p-3 rounded-md ${darkMode ? "bg-green-900 text-green-100" : "bg-green-50 text-green-800"}`}>
+                    <h4 className="font-medium text-sm mb-2">🚀 Next Steps:</h4>
+                    <ol className="text-xs space-y-1">
+                      <li>1. Configure your Client IDs above</li>
+                      <li>2. Close this settings panel</li>
+                      <li>3. Select a platform and click "Login"</li>
+                      <li>4. Complete the OAuth flow</li>
+                      <li>5. Start posting with the "Post to [Platform]" button!</li>
+                    </ol>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                      💡 Client IDs are configured via .env file
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={clearOAuthLocalStorage}
+                        className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-orange-500 hover:bg-orange-600 text-white"}`}
+                      >
+                        🧹 Clear Cache
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Reset all OAuth settings to default?')) {
+                            setOauthConfig(DEFAULT_OAUTH_CONFIG);
+                          }
+                        }}
+                        className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                      >
+                        🔄 Reset to Default
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
