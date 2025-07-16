@@ -1,0 +1,18 @@
+{
+  "ignores": [
+    "@types/*",
+    "@testing-library/*",
+    "jest",
+    "babel-*",
+    "eslint-*",
+    "prettier",
+    "autoprefixer",
+    "identity-obj-proxy", 
+    "jest-environment-jsdom",
+    "postcss",
+    "tailwindcss",
+    "ts-jest",
+    "@typescript-eslint/eslint-plugin"
+  ],
+  "skip-missing": false
+} 
