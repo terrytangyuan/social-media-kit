@@ -47,34 +47,6 @@ jobs:
           test-results.xml
         retention-days: 30
 
-  test-coverage:
-    name: Test Coverage
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Run tests with coverage
-      run: npm run test:coverage
-      
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-
   build-and-deploy-test:
     name: Build and Test Deployment
     runs-on: ubuntu-latest
