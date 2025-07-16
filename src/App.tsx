@@ -1331,6 +1331,9 @@ function App() {
       } else if (selectedPlatform === 'linkedin' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('linkedin');
         alert(`❌ LinkedIn authentication expired. You have been logged out. Please login again to continue posting.`);
+      } else if (selectedPlatform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
+        logout('bluesky');
+        alert(`❌ Bluesky authentication expired. You have been logged out. Please login again to continue posting.`);
       } else {
         alert(`❌ Failed to post to ${selectedPlatform}: ${error}`);
       }
@@ -1438,6 +1441,8 @@ function App() {
             logout('twitter');
           } else if (platform === 'linkedin' && error instanceof Error && error.message.includes('Authentication failed')) {
             logout('linkedin');
+          } else if (platform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
+            logout('bluesky');
           }
           
           results.push({ 
