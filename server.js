@@ -105,7 +105,7 @@ app.post('/api/oauth/token', async (req, res) => {
       console.log('Attempting to fetch LinkedIn user profile (optional)...');
       try {
         // Try the v2 userinfo endpoint (most reliable)
-        let profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+        const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
           }

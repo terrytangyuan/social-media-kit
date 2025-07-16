@@ -1263,7 +1263,7 @@ function App() {
       const chunks = chunkText(formattedText, selectedPlatform);
       const formattedChunks = chunks;
       
-      let results = [];
+      const results = [];
       
       let previousPostId: string | undefined;
       let previousPostUri: string | undefined;
@@ -1502,7 +1502,7 @@ function App() {
       }
       
       // Find the best break point within the limit
-      let breakPoint = findBestBreakPoint(remainingText, limit);
+      const breakPoint = findBestBreakPoint(remainingText, limit);
       
       // Extract chunk and clean up
       let chunk = remainingText.substring(0, breakPoint).replace(/\s+$/, ''); // Remove trailing whitespace
