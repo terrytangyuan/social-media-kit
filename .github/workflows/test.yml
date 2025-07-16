@@ -1,0 +1,170 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'jest.config.js'
+      - 'babel.config.js'
+      - 'tsconfig.json'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'jest.config.js'
+      - 'babel.config.js'
+      - 'tsconfig.json'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run text formatting tests
+      run: npm test src/utils/textFormatting.test.ts
+      
+    - name: Run tagging system tests
+      run: npm test src/utils/tagging.test.ts
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run OAuth authentication tests
+      run: npm test tests/auth/oauth.test.ts
+      
+    - name: Run server API tests
+      run: npm test tests/server/api.test.ts
+
+  component-tests:
+    name: React Component Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run App component tests
+      run: npm test src/components/__tests__/App.test.tsx
+      
+    - name: Run integration workflow tests
+      run: npm test src/components/__tests__/integration.test.tsx
+
+  full-test-suite:
+    name: Full Test Suite (All 120 Tests)
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, component-tests]
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run complete test suite
+      run: npm test -- --verbose --coverage
+      
+    - name: Verify test count
+      run: |
+        TEST_COUNT=$(npm test -- --passWithNoTests --silent | grep -o '[0-9]\+ passed' | head -1 | grep -o '[0-9]\+')
+        echo "Tests passed: $TEST_COUNT"
+        if [ "$TEST_COUNT" -ne "120" ]; then
+          echo "Expected 120 tests, but $TEST_COUNT passed"
+          exit 1
+        fi
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: matrix.node-version == '18.x'
+      with:
+        name: coverage-reports
+        path: coverage/
+        retention-days: 14
+
+  test-performance:
+    name: Test Performance
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests with timing
+      run: |
+        echo "Starting test performance measurement..."
+        START_TIME=$(date +%s)
+        npm test
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        echo "Test execution time: ${DURATION} seconds"
+        
+        # Fail if tests take longer than 2 minutes
+        if [ $DURATION -gt 120 ]; then
+          echo "Tests took too long: ${DURATION} seconds (max: 120)"
+          exit 1
+        fi
+        
+    - name: Check test coverage threshold
+      run: npm run test:coverage -- --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}' 

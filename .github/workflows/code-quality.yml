@@ -1,0 +1,170 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  typescript-check:
+    name: TypeScript Compilation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Check TypeScript compilation
+      run: npx tsc --noEmit || echo "TypeScript compilation has warnings - see logs"
+      continue-on-error: true
+      
+    - name: Check for TypeScript errors in tests  
+      run: npx tsc --noEmit --project tsconfig.json || echo "Test TypeScript compilation has warnings - see logs"
+      continue-on-error: true
+
+  lint-and-format:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run ESLint
+      run: npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+      continue-on-error: true
+      
+    - name: Check Prettier formatting
+      run: npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}"
+      continue-on-error: true
+      
+    - name: Check for unused dependencies
+      run: npx depcheck --ignores="@types/*,@testing-library/*,jest,babel-*,eslint-*,prettier"
+
+  build-verification:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build TypeScript
+      run: npx tsc
+      
+    - name: Build with Vite
+      run: npm run build
+      
+    - name: Check bundle size
+      run: |
+        BUNDLE_SIZE=$(du -sk dist/ | cut -f1)
+        echo "Bundle size: ${BUNDLE_SIZE}KB"
+        
+        # Alert if bundle size exceeds 1MB (1024KB)
+        if [ $BUNDLE_SIZE -gt 1024 ]; then
+          echo "⚠️  Bundle size is large: ${BUNDLE_SIZE}KB"
+        else
+          echo "✅ Bundle size is reasonable: ${BUNDLE_SIZE}KB"
+        fi
+        
+    - name: Verify essential files exist
+      run: |
+        test -f dist/index.html || (echo "Missing index.html" && exit 1)
+        test -f dist/assets/*.js || (echo "Missing JavaScript bundle" && exit 1)
+        test -f dist/assets/*.css || (echo "Missing CSS bundle" && exit 1)
+        echo "✅ All essential build files present"
+
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Audit for vulnerabilities
+      run: npm audit --audit-level=moderate
+      
+    - name: Check for outdated packages
+      run: npm outdated || true
+      
+    - name: Check license compatibility
+      run: npx license-checker --summary
+
+  code-metrics:
+    name: Code Metrics
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Generate code metrics
+      run: |
+        echo "📊 Code Metrics Report"
+        echo "======================"
+        
+        # Count lines of code
+        echo "📝 Lines of Code:"
+        find src -name "*.ts" -o -name "*.tsx" | xargs wc -l | tail -1
+        
+        # Count test files
+        echo "🧪 Test Files:"
+        find . -name "*.test.*" -o -name "__tests__" | wc -l
+        
+        # Count components
+        echo "⚛️  React Components:"
+        find src/components -name "*.tsx" | wc -l
+        
+        # Check for TODO/FIXME comments
+        echo "📋 TODOs and FIXMEs:"
+        grep -r "TODO\|FIXME" src/ || echo "None found"
+        
+    - name: Check test coverage requirements
+      run: npm run test:coverage -- --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}' 

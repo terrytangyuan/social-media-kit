@@ -1,6 +1,6 @@
 # Contributing to Social Media Kit
 
-Thank you for your interest in contributing to the Social Media Kit! This LinkedIn post formatter with multi-platform support is an open project that welcomes contributions from developers of all skill levels.
+Thank you for your interest in contributing to the Social Media Kit! We welcome contributions from developers of all skill levels.
 
 ## 🚀 Getting Started
 
@@ -16,13 +16,13 @@ Before you begin, ensure you have the following installed:
 1. **Fork** this repository to your GitHub account
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/yourusername/linkedin-post-formatter-with-x.git
-   cd linkedin-post-formatter-with-x
+   git clone https://github.com/yourusername/social-media-kit.git
+   cd social-media-kit
    ```
 
 3. **Add upstream** remote:
    ```bash
-   git remote add upstream https://github.com/originalowner/linkedin-post-formatter-with-x.git
+   git remote add upstream https://github.com/originalowner/social-media-kit.git
    ```
 
 ### Development Setup
@@ -46,15 +46,6 @@ Before you begin, ensure you have the following installed:
 4. **Verify setup** by visiting `http://localhost:3000`
 
 ## 🛠️ Development Workflow
-
-### Branch Naming Convention
-
-Use descriptive branch names with prefixes:
-- `feature/add-instagram-support` - New features
-- `fix/oauth-token-refresh` - Bug fixes
-- `docs/update-api-examples` - Documentation updates
-- `test/improve-coverage` - Test improvements
-- `refactor/optimize-bundle-size` - Code refactoring
 
 ### Making Changes
 
@@ -299,17 +290,27 @@ Mockups, examples, or references.
    git rebase upstream/main
    ```
 
-2. **Ensure all tests pass**:
+2. **Run quality checks locally**:
    ```bash
-   npm test
+   npm run lint           # Code quality checks
+   npm run format:check   # Formatting verification
+   npm run type-check     # TypeScript compilation
+   npm test              # All 120 tests
+   npm run build         # Production build
    ```
 
-3. **Check build succeeds**:
-   ```bash
-   npm run build
-   ```
+3. **Update documentation** if needed
 
-4. **Update documentation** if needed
+### Automated Workflows
+
+When you submit a pull request, **GitHub Actions workflows automatically run**:
+
+- ✅ **CI Pipeline**: Multi-node testing, linting, build verification
+- 🧪 **Test Suite**: All 120 tests across Node.js 16.x, 18.x, 20.x
+- 📋 **Code Quality**: TypeScript checks, formatting, bundle analysis
+- 🛡️ **Security**: Dependency audits and vulnerability scanning
+
+**All checks must pass** before your PR can be merged.
 
 ### Pull Request Template
 

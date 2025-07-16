@@ -14,7 +14,12 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:server": "jest --testPathPattern=tests/server"
+    "test:server": "jest --testPathPattern=tests/server",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "cors": "^2.8.5",
