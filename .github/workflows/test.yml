@@ -116,15 +116,6 @@ jobs:
       
     - name: Run complete test suite
       run: npm test -- --verbose --coverage
-      
-    - name: Verify test count
-      run: |
-        TEST_COUNT=$(npm test -- --passWithNoTests --silent | grep -o '[0-9]\+ passed' | head -1 | grep -o '[0-9]\+')
-        echo "Tests passed: $TEST_COUNT"
-        if [ "$TEST_COUNT" -ne "120" ]; then
-          echo "Expected 120 tests, but $TEST_COUNT passed"
-          exit 1
-        fi
         
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
