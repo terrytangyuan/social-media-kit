@@ -468,12 +468,12 @@ describe('App Component', () => {
       const dataToSave = {
         posts: posts,
         exportedAt: new Date().toISOString(),
-        appVersion: '1.0.0'
+        appVersion: '0.2.1'
       };
 
       expect(dataToSave.posts).toHaveLength(1);
       expect(dataToSave.posts[0].title).toBe('Post 1');
-      expect(dataToSave.appVersion).toBe('1.0.0');
+      expect(dataToSave.appVersion).toBe('0.2.1');
     });
   });
 

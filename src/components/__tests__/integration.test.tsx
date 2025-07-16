@@ -297,7 +297,7 @@ describe('End-to-End User Workflows', () => {
         return {
           posts: posts,
           exportedAt: new Date().toISOString(),
-          appVersion: '1.0.0'
+          appVersion: '0.2.1'
         };
       };
       
@@ -320,7 +320,7 @@ describe('End-to-End User Workflows', () => {
       
       const exportData = exportPosts(posts);
       expect(exportData.posts).toHaveLength(2);
-      expect(exportData.appVersion).toBe('1.0.0');
+      expect(exportData.appVersion).toBe('0.2.1');
       
       const importedPosts = importPosts(exportData);
       expect(importedPosts).toHaveLength(2);

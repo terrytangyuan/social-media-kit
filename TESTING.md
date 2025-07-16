@@ -55,6 +55,52 @@ This project includes a complete testing infrastructure with unit tests, integra
   - Real-time features (notifications, character counting)
   - Rate limiting and API error scenarios
 
+## 📁 Test Organization
+
+### **Test Structure Overview**
+
+Tests are organized using a **mixed approach** that follows industry best practices:
+
+```
+tests/                          # Root-level test directory
+├── auth/
+│   └── oauth.test.ts          # OAuth authentication flows
+└── server/
+    └── api.test.ts            # Server API endpoints
+
+src/                           # Co-located with source code
+├── utils/
+│   ├── textFormatting.test.ts # Next to textFormatting functionality
+│   └── tagging.test.ts        # Next to tagging functionality
+└── components/
+    └── __tests__/
+        ├── App.test.tsx        # React component tests
+        └── integration.test.tsx # End-to-end workflows
+```
+
+### **🎯 The Logic Behind Each Location**
+
+| **Test Location** | **Test Type** | **Why Here?** |
+|------------------|---------------|---------------|
+| `tests/auth/` | Authentication flows | Cross-platform, server interaction, not tied to specific source files |
+| `tests/server/` | API endpoints | Backend-only functionality, no frontend dependency |
+| `src/utils/` | Pure functions | Co-located with utility functions for easy discovery |
+| `src/components/__tests__/` | React components | Standard React testing convention, proximity to components |
+
+### **✅ Benefits of This Approach**
+
+**Root `tests/` Directory:**
+- 🔐 **Cross-cutting concerns**: OAuth and API tests span multiple modules
+- 🖥️ **Server-side isolation**: Server tests are separate from frontend code
+- 🌐 **Integration focus**: Tests that involve multiple system components
+- 🧪 **Test-specific setup**: Easier to manage test-only configurations
+
+**Co-located Tests:**
+- 🔗 **Proximity**: Tests live next to the code they validate
+- 🔍 **Discoverability**: Easy to find tests for specific utilities
+- ♻️ **Refactoring safety**: When you move/rename code, tests move with it
+- 📦 **Module focus**: Tests are tightly coupled to their respective modules
+
 ## 🛠️ Testing Framework
 
 ### **Technologies Used**
