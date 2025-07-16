@@ -292,7 +292,9 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+We welcome contributions from developers of all skill levels! Whether you're fixing bugs, adding features, improving documentation, or enhancing tests, your help makes this project better.
+
+📋 **For detailed guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)**
 
 ---
 
