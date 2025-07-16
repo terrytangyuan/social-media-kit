@@ -1714,7 +1714,7 @@ function App() {
           }
         }, delay);
         
-        timeouts.push(timeout);
+        timeouts.push(timeout as unknown as number);
       });
     };
 

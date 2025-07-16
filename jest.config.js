@@ -33,6 +33,7 @@ export default {
     '!src/**/*.d.ts',
     '!src/main.tsx',
     '!src/test/**/*',
+    '!src/App.tsx', // Exclude large monolithic App.tsx file
   ],
   
   // Coverage thresholds

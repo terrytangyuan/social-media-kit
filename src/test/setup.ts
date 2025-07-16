@@ -1,5 +1,21 @@
 import '@testing-library/jest-dom';
 
+// Type declarations for jest-dom matchers
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toBeInTheDocument(): R;
+      toHaveClass(className: string): R;
+      toHaveTextContent(text: string): R;
+      toBeVisible(): R;
+      toBeDisabled(): R;
+      toBeEnabled(): R;
+      toHaveValue(value: string | number): R;
+      toHaveStyle(css: Record<string, any>): R;
+    }
+  }
+}
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -21,53 +37,72 @@ const localStorageMock = {
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
+  length: 0,
+  key: jest.fn(),
 };
 Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
+  value: localStorageMock
 });
 
 // Mock sessionStorage
-const sessionStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-};
 Object.defineProperty(window, 'sessionStorage', {
-  value: sessionStorageMock,
+  value: localStorageMock
 });
 
-// Skip window.location mock to avoid JSDOM conflicts
-// Tests will use the default JSDOM location object
-
-// Mock Notification API
-Object.defineProperty(window, 'Notification', {
-  value: class MockNotification {
-    static permission = 'default';
-    static requestPermission = jest.fn().mockResolvedValue('granted');
-    constructor(title: string, options?: NotificationOptions) {
-      // Mock notification instance
-    }
+// Mock window.location
+Object.defineProperty(window, 'location', {
+  value: {
+    href: 'http://localhost:3000',
+    origin: 'http://localhost:3000',
+    protocol: 'http:',
+    host: 'localhost:3000',
+    hostname: 'localhost',
+    port: '3000',
+    pathname: '/',
+    search: '',
+    hash: '',
+    assign: jest.fn(),
+    replace: jest.fn(),
+    reload: jest.fn(),
   },
   writable: true,
 });
 
-// Mock crypto.getRandomValues for PKCE generation
+// Mock crypto for UUID generation
 Object.defineProperty(window, 'crypto', {
   value: {
-    getRandomValues: jest.fn().mockImplementation((array: Uint8Array) => {
-      // Fill with deterministic values for testing
-      for (let i = 0; i < array.length; i++) {
-        array[i] = i % 256;
+    randomUUID: jest.fn(() => 'mocked-uuid-1234'),
+    getRandomValues: jest.fn((arr) => {
+      for (let i = 0; i < arr.length; i++) {
+        arr[i] = Math.floor(Math.random() * 256);
       }
-      return array;
+      return arr;
     }),
-    subtle: {
-      digest: jest.fn().mockResolvedValue(new ArrayBuffer(32)),
-    },
   },
+});
+
+// Mock Notification API
+global.Notification = jest.fn().mockImplementation((title: string, options?: NotificationOptions) => ({
+  title,
+  ...options,
+  close: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  dispatchEvent: jest.fn(),
+})) as any;
+
+Object.defineProperty(global.Notification, 'permission', {
+  value: 'granted',
   writable: true,
 });
+
+Object.defineProperty(global.Notification, 'requestPermission', {
+  value: jest.fn().mockResolvedValue('granted'),
+  writable: true,
+});
+
+// Mock fetch for testing
+global.fetch = jest.fn();
 
 // Mock marked library
 jest.mock('marked', () => ({
@@ -81,5 +116,4 @@ jest.setTimeout(10000);
 afterEach(() => {
   jest.clearAllMocks();
   localStorageMock.clear();
-  sessionStorageMock.clear();
 }); 

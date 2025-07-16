@@ -1,327 +1,270 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-
-// Mock the unified tagging types and functions
-type PersonMapping = {
-  id: string;
-  name: string;
-  displayName: string;
-  twitter?: string;
-  bluesky?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type Platform = 'linkedin' | 'twitter' | 'bluesky';
-
-// Mock utility functions for tagging
-const convertUnifiedTags = (text: string, platform: Platform, personMappings: PersonMapping[]): string => {
-  // Find all @{PersonName} patterns
-  return text.replace(/@\{([^}]+)\}/g, (match, personName) => {
-    const person = personMappings.find(p => 
-      p.name.toLowerCase() === personName.toLowerCase() ||
-      p.displayName.toLowerCase() === personName.toLowerCase()
-    );
-    
-    if (!person) {
-      return match; // Keep original if person not found
-    }
-    
-    switch (platform) {
-      case 'linkedin':
-        return `@${person.displayName}`;
-      case 'twitter':
-        return person.twitter ? `@${person.twitter}` : match;
-      case 'bluesky':
-        return person.bluesky ? `@${person.bluesky}` : match;
-      default:
-        return match;
-    }
-  });
-};
-
-const extractMentions = (text: string): string[] => {
-  const mentions: string[] = [];
-  const regex = /@\{([^}]+)\}/g;
-  let match;
-  
-  while ((match = regex.exec(text)) !== null) {
-    mentions.push(match[1]);
-  }
-  
-  return mentions;
-};
-
-const validatePersonMapping = (person: Partial<PersonMapping>): string[] => {
-  const errors: string[] = [];
-  
-  if (!person.name || person.name.trim().length === 0) {
-    errors.push('Name is required');
-  }
-  
-  if (!person.displayName || person.displayName.trim().length === 0) {
-    errors.push('Display name is required');
-  }
-  
-  if (person.twitter && !person.twitter.match(/^[a-zA-Z0-9_]+$/)) {
-    errors.push('Twitter handle must contain only letters, numbers, and underscores');
-  }
-  
-  if (person.bluesky && !person.bluesky.includes('.')) {
-    errors.push('Bluesky handle must be a valid domain format');
-  }
-  
-  return errors;
-};
-
-const createPersonMapping = (
-  name: string,
-  displayName: string,
-  twitter?: string,
-  bluesky?: string
-): PersonMapping => {
-  const now = new Date().toISOString();
-  return {
-    id: `person_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    name: name.trim(),
-    displayName: displayName.trim(),
-    twitter: twitter?.trim(),
-    bluesky: bluesky?.trim(),
-    createdAt: now,
-    updatedAt: now,
-  };
-};
+import { createTaggingSystem, PersonMapping, TaggingSystem } from './tagging';
 
 describe('Unified Tagging System', () => {
-  let mockPersonMappings: PersonMapping[];
+  let taggingSystem: TaggingSystem;
 
   beforeEach(() => {
-    mockPersonMappings = [
-      {
-        id: 'person_1',
-        name: 'john',
+    taggingSystem = createTaggingSystem();
+  });
+
+  describe('PersonMapping Management', () => {
+    it('should add a new person mapping', () => {
+      const person = taggingSystem.addPersonMapping({
+        name: 'John Doe',
         displayName: 'John Doe',
         twitter: 'johndoe',
-        bluesky: 'john.doe.com',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      },
-      {
-        id: 'person_2',
-        name: 'jane',
-        displayName: 'Jane Smith',
-        twitter: 'janesmith',
-        bluesky: 'jane.smith.bsky.social',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      },
-      {
-        id: 'person_3',
-        name: 'bob',
-        displayName: 'Bob Wilson',
-        twitter: undefined, // No Twitter handle
-        bluesky: 'bob.wilson.xyz',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      },
-    ];
-  });
+        bluesky: 'johndoe.bsky.social'
+      });
 
-  describe('convertUnifiedTags', () => {
-    it('should convert unified tags to LinkedIn format', () => {
-      const text = 'Hello @{john} and @{jane}!';
-      const result = convertUnifiedTags(text, 'linkedin', mockPersonMappings);
-      expect(result).toBe('Hello @John Doe and @Jane Smith!');
-    });
-
-    it('should convert unified tags to Twitter format', () => {
-      const text = 'Hello @{john} and @{jane}!';
-      const result = convertUnifiedTags(text, 'twitter', mockPersonMappings);
-      expect(result).toBe('Hello @johndoe and @janesmith!');
-    });
-
-    it('should convert unified tags to Bluesky format', () => {
-      const text = 'Hello @{john} and @{jane}!';
-      const result = convertUnifiedTags(text, 'bluesky', mockPersonMappings);
-      expect(result).toBe('Hello @john.doe.com and @jane.smith.bsky.social!');
-    });
-
-    it('should handle case-insensitive person name matching', () => {
-      const text = 'Hello @{JOHN} and @{Jane}!';
-      const result = convertUnifiedTags(text, 'linkedin', mockPersonMappings);
-      expect(result).toBe('Hello @John Doe and @Jane Smith!');
-    });
-
-    it('should match by display name as well as name', () => {
-      const text = 'Hello @{John Doe}!';
-      const result = convertUnifiedTags(text, 'twitter', mockPersonMappings);
-      expect(result).toBe('Hello @johndoe!');
-    });
-
-    it('should keep original tag if person not found', () => {
-      const text = 'Hello @{unknown}!';
-      const result = convertUnifiedTags(text, 'linkedin', mockPersonMappings);
-      expect(result).toBe('Hello @{unknown}!');
-    });
-
-    it('should handle missing platform handles gracefully', () => {
-      const text = 'Hello @{bob}!'; // Bob has no Twitter handle
-      const result = convertUnifiedTags(text, 'twitter', mockPersonMappings);
-      expect(result).toBe('Hello @{bob}!'); // Should keep original
-    });
-
-    it('should handle multiple occurrences of the same person', () => {
-      const text = '@{john} mentioned @{john} again';
-      const result = convertUnifiedTags(text, 'twitter', mockPersonMappings);
-      expect(result).toBe('@johndoe mentioned @johndoe again');
-    });
-
-    it('should handle tags within larger text blocks', () => {
-      const text = `
-        Great meeting today with @{john} and @{jane}.
-        Looking forward to collaborating with @{bob} next week.
-      `;
-      const result = convertUnifiedTags(text, 'linkedin', mockPersonMappings);
-      expect(result).toContain('@John Doe');
-      expect(result).toContain('@Jane Smith');
-      expect(result).toContain('@Bob Wilson');
-    });
-  });
-
-  describe('extractMentions', () => {
-    it('should extract all mention names from text', () => {
-      const text = 'Hello @{john} and @{jane}!';
-      const mentions = extractMentions(text);
-      expect(mentions).toEqual(['john', 'jane']);
-    });
-
-    it('should handle no mentions', () => {
-      const text = 'Hello world!';
-      const mentions = extractMentions(text);
-      expect(mentions).toEqual([]);
-    });
-
-    it('should handle duplicate mentions', () => {
-      const text = '@{john} said @{john} would help';
-      const mentions = extractMentions(text);
-      expect(mentions).toEqual(['john', 'john']);
-    });
-
-    it('should handle mentions with spaces in names', () => {
-      const text = 'Hello @{John Doe} and @{Jane Smith}!';
-      const mentions = extractMentions(text);
-      expect(mentions).toEqual(['John Doe', 'Jane Smith']);
-    });
-
-    it('should handle malformed tags gracefully', () => {
-      const text = 'Hello @{john and @jane}!';
-      const mentions = extractMentions(text);
-      expect(mentions).toEqual(['john and @jane']);
-    });
-  });
-
-  describe('validatePersonMapping', () => {
-    it('should pass validation for valid person mapping', () => {
-      const person = {
-        name: 'john',
+      expect(person).toMatchObject({
+        name: 'John Doe',
         displayName: 'John Doe',
         twitter: 'johndoe',
-        bluesky: 'john.doe.com',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toEqual([]);
-    });
-
-    it('should require name', () => {
-      const person = {
-        displayName: 'John Doe',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toContain('Name is required');
-    });
-
-    it('should require display name', () => {
-      const person = {
-        name: 'john',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toContain('Display name is required');
-    });
-
-    it('should validate Twitter handle format', () => {
-      const person = {
-        name: 'john',
-        displayName: 'John Doe',
-        twitter: 'john@doe!',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toContain('Twitter handle must contain only letters, numbers, and underscores');
-    });
-
-    it('should validate Bluesky handle format', () => {
-      const person = {
-        name: 'john',
-        displayName: 'John Doe',
-        bluesky: 'johndoe',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toContain('Bluesky handle must be a valid domain format');
-    });
-
-    it('should allow optional Twitter and Bluesky handles', () => {
-      const person = {
-        name: 'john',
-        displayName: 'John Doe',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toEqual([]);
-    });
-
-    it('should handle empty string fields', () => {
-      const person = {
-        name: '',
-        displayName: '',
-        twitter: '',
-        bluesky: '',
-      };
-      const errors = validatePersonMapping(person);
-      expect(errors).toContain('Name is required');
-      expect(errors).toContain('Display name is required');
-    });
-  });
-
-  describe('createPersonMapping', () => {
-    it('should create person mapping with required fields', () => {
-      const person = createPersonMapping('john', 'John Doe');
-      
-      expect(person.name).toBe('john');
-      expect(person.displayName).toBe('John Doe');
-      expect(person.id).toMatch(/^person_/);
+        bluesky: 'johndoe.bsky.social'
+      });
+      expect(person.id).toBeDefined();
       expect(person.createdAt).toBeDefined();
-      expect(person.updatedAt).toBeDefined();
-      expect(person.createdAt).toBe(person.updatedAt);
     });
 
-    it('should create person mapping with optional handles', () => {
-      const person = createPersonMapping('john', 'John Doe', 'johndoe', 'john.doe.com');
-      
-      expect(person.twitter).toBe('johndoe');
-      expect(person.bluesky).toBe('john.doe.com');
+    it('should update an existing person mapping', () => {
+      const person = taggingSystem.addPersonMapping({
+        name: 'Jane Smith',
+        displayName: 'Jane Smith'
+      });
+
+      const updated = taggingSystem.updatePersonMapping(person.id, {
+        twitter: 'janesmith',
+        bluesky: 'jane.bsky.social'
+      });
+
+      expect(updated).toBe(true);
+      const retrievedPerson = taggingSystem.getPersonMapping(person.id);
+      expect(retrievedPerson?.twitter).toBe('janesmith');
+      expect(retrievedPerson?.bluesky).toBe('jane.bsky.social');
     });
 
-    it('should trim whitespace from inputs', () => {
-      const person = createPersonMapping('  john  ', '  John Doe  ', '  johndoe  ', '  john.doe.com  ');
-      
-      expect(person.name).toBe('john');
-      expect(person.displayName).toBe('John Doe');
-      expect(person.twitter).toBe('johndoe');
-      expect(person.bluesky).toBe('john.doe.com');
+    it('should delete a person mapping', () => {
+      const person = taggingSystem.addPersonMapping({
+        name: 'Test User',
+        displayName: 'Test User'
+      });
+
+      const deleted = taggingSystem.deletePersonMapping(person.id);
+      expect(deleted).toBe(true);
+
+      const retrievedPerson = taggingSystem.getPersonMapping(person.id);
+      expect(retrievedPerson).toBeUndefined();
     });
 
-    it('should generate unique IDs', () => {
-      const person1 = createPersonMapping('john1', 'John One');
-      const person2 = createPersonMapping('john2', 'John Two');
-      
-      expect(person1.id).not.toBe(person2.id);
+    it('should return false when updating non-existent person', () => {
+      const updated = taggingSystem.updatePersonMapping('non-existent-id', {
+        name: 'Updated Name'
+      });
+      expect(updated).toBe(false);
+    });
+
+    it('should return false when deleting non-existent person', () => {
+      const deleted = taggingSystem.deletePersonMapping('non-existent-id');
+      expect(deleted).toBe(false);
+    });
+
+    it('should retrieve person mappings list', () => {
+      taggingSystem.addPersonMapping({
+        name: 'Person 1',
+        displayName: 'Person 1'
+      });
+
+      taggingSystem.addPersonMapping({
+        name: 'Person 2',
+        displayName: 'Person 2'
+      });
+
+      const mappings = taggingSystem.personMappings;
+      expect(mappings).toHaveLength(2);
+      expect(mappings[0].name).toBe('Person 1');
+      expect(mappings[1].name).toBe('Person 2');
+    });
+  });
+
+  describe('Tag Format Validation', () => {
+    it('should validate correct unified tag format', () => {
+      expect(taggingSystem.validateTagFormat('@{John Doe}')).toBe(true);
+      expect(taggingSystem.validateTagFormat('@{Jane Smith}')).toBe(true);
+      expect(taggingSystem.validateTagFormat('@{Multi Word Name}')).toBe(true);
+    });
+
+    it('should reject invalid tag formats', () => {
+      expect(taggingSystem.validateTagFormat('@John Doe')).toBe(false);
+      expect(taggingSystem.validateTagFormat('{John Doe}')).toBe(false);
+      expect(taggingSystem.validateTagFormat('@{}')).toBe(false);
+      expect(taggingSystem.validateTagFormat('@{John Doe')).toBe(false);
+      expect(taggingSystem.validateTagFormat('John Doe}')).toBe(false);
+    });
+
+    it('should handle whitespace in validation', () => {
+      expect(taggingSystem.validateTagFormat(' @{John Doe} ')).toBe(true);
+      expect(taggingSystem.validateTagFormat('@{ John Doe }')).toBe(true);
+    });
+  });
+
+  describe('Tag Extraction', () => {
+    it('should extract unified tags from text', () => {
+      const text = 'Hello @{John Doe} and @{Jane Smith}!';
+      const tags = taggingSystem.extractUnifiedTags(text);
+      expect(tags).toEqual(['@{John Doe}', '@{Jane Smith}']);
+    });
+
+    it('should extract single tag', () => {
+      const text = 'Hello @{John Doe}!';
+      const tags = taggingSystem.extractUnifiedTags(text);
+      expect(tags).toEqual(['@{John Doe}']);
+    });
+
+    it('should return empty array when no tags found', () => {
+      const text = 'Hello world!';
+      const tags = taggingSystem.extractUnifiedTags(text);
+      expect(tags).toEqual([]);
+    });
+
+    it('should handle multiple occurrences of same tag', () => {
+      const text = 'Hello @{John Doe} and thanks @{John Doe}!';
+      const tags = taggingSystem.extractUnifiedTags(text);
+      expect(tags).toEqual(['@{John Doe}', '@{John Doe}']);
+    });
+
+    it('should handle tags with special characters in names', () => {
+      const text = 'Hello @{Dr. Smith-Jones} and @{Mary O\'Connor}!';
+      const tags = taggingSystem.extractUnifiedTags(text);
+      expect(tags).toEqual(['@{Dr. Smith-Jones}', '@{Mary O\'Connor}']);
+    });
+  });
+
+  describe('Platform-Specific Tag Conversion', () => {
+    beforeEach(() => {
+      taggingSystem.addPersonMapping({
+        name: 'John Doe',
+        displayName: 'John Doe',
+        twitter: 'johndoe',
+        bluesky: 'johndoe.bsky.social'
+      });
+
+      taggingSystem.addPersonMapping({
+        name: 'Jane Smith',
+        displayName: 'Jane Smith',
+        twitter: 'janesmith123'
+      });
+    });
+
+    describe('LinkedIn conversion', () => {
+      it('should convert to display names for LinkedIn', () => {
+        const text = 'Hello @{John Doe} and @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'linkedin');
+        expect(converted).toBe('Hello @John Doe and @Jane Smith!');
+      });
+
+      it('should handle unmapped persons with display name fallback', () => {
+        const text = 'Hello @{Unknown Person}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'linkedin');
+        expect(converted).toBe('Hello @Unknown Person!');
+      });
+    });
+
+    describe('Twitter conversion', () => {
+      it('should convert to Twitter handles', () => {
+        const text = 'Hello @{John Doe} and @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @johndoe and @janesmith123!');
+      });
+
+      it('should fallback to display name when no Twitter handle', () => {
+        taggingSystem.addPersonMapping({
+          name: 'No Twitter',
+          displayName: 'No Twitter User'
+        });
+
+        const text = 'Hello @{No Twitter}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @No Twitter User!');
+      });
+
+      it('should remove @ prefix from Twitter handles', () => {
+        taggingSystem.addPersonMapping({
+          name: 'Test User',
+          displayName: 'Test User',
+          twitter: '@testuser' // Handle with @ prefix
+        });
+
+        const text = 'Hello @{Test User}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @testuser!');
+      });
+    });
+
+    describe('Bluesky conversion', () => {
+      it('should convert to Bluesky handles', () => {
+        const text = 'Hello @{John Doe}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
+        expect(converted).toBe('Hello @johndoe.bsky.social!');
+      });
+
+      it('should fallback to display name when no Bluesky handle', () => {
+        const text = 'Hello @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
+        expect(converted).toBe('Hello @Jane Smith!');
+      });
+
+      it('should remove @ prefix from Bluesky handles', () => {
+        taggingSystem.addPersonMapping({
+          name: 'Test User',
+          displayName: 'Test User',
+          bluesky: '@test.bsky.social' // Handle with @ prefix
+        });
+
+        const text = 'Hello @{Test User}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
+        expect(converted).toBe('Hello @test.bsky.social!');
+      });
+    });
+
+    describe('Case-insensitive matching', () => {
+      it('should match person names case-insensitively', () => {
+        const text = 'Hello @{john doe} and @{JANE SMITH}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @johndoe and @janesmith123!');
+      });
+
+      it('should match display names case-insensitively', () => {
+        taggingSystem.addPersonMapping({
+          name: 'test-user',
+          displayName: 'Test User',
+          twitter: 'testuser'
+        });
+
+        const text = 'Hello @{test user} and @{TEST USER}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @testuser and @testuser!');
+      });
+    });
+
+    describe('Complex scenarios', () => {
+      it('should handle mixed mapped and unmapped persons', () => {
+        const text = 'Hello @{John Doe}, @{Unknown Person}, and @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @johndoe, @Unknown Person, and @janesmith123!');
+      });
+
+      it('should preserve text formatting around tags', () => {
+        const text = 'Thanks to @{John Doe} for the **great** _work_!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'linkedin');
+        expect(converted).toBe('Thanks to @John Doe for the **great** _work_!');
+      });
+
+      it('should handle tags at beginning and end of text', () => {
+        const text = '@{John Doe} says hello to @{Jane Smith}';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('@johndoe says hello to @janesmith123');
+      });
     });
   });
 }); 
