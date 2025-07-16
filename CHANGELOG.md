@@ -16,6 +16,10 @@
   - Clear instructions and help text for LinkedIn's manual tagging requirements
 - **Persistent Storage**: All person mappings automatically saved to localStorage
 
+#### Other Improvements
+- Handle logout for Twitter/X gracefully when session expires
+- Support undo/redo in in the post editor
+- Add resize indicator in the editor text area
 
 ## v0.2.0
 
