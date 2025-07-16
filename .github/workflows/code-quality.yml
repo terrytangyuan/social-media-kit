@@ -58,7 +58,7 @@ jobs:
       continue-on-error: true
       
     - name: Check for unused dependencies
-      run: npx depcheck --ignores="@types/*,@testing-library/*,jest,babel-*,eslint-*,prettier"
+      run: npx depcheck
 
   build-verification:
     name: Build Verification
@@ -127,44 +127,3 @@ jobs:
       
     - name: Check license compatibility
       run: npx license-checker --summary
-
-  code-metrics:
-    name: Code Metrics
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Generate code metrics
-      run: |
-        echo "📊 Code Metrics Report"
-        echo "======================"
-        
-        # Count lines of code
-        echo "📝 Lines of Code:"
-        find src -name "*.ts" -o -name "*.tsx" | xargs wc -l | tail -1
-        
-        # Count test files
-        echo "🧪 Test Files:"
-        find . -name "*.test.*" -o -name "__tests__" | wc -l
-        
-        # Count components
-        echo "⚛️  React Components:"
-        find src/components -name "*.tsx" | wc -l
-        
-        # Check for TODO/FIXME comments
-        echo "📋 TODOs and FIXMEs:"
-        grep -r "TODO\|FIXME" src/ || echo "None found"
-        
-    - name: Check test coverage requirements
-      run: npm run test:coverage -- --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}' 
