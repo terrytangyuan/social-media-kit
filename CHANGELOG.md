@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## [0.2.2]
+## v0.2.2
 
 ### 🚀 Performance Improvements
 
@@ -42,7 +42,7 @@
 - **Reduced Complexity**: Simplified main component reduces cognitive load
 - **Professional Structure**: Industry-standard React patterns and organization
 
-## [v0.2.1]
+## v0.2.1
 
 ### 🏷️ New Features
 
@@ -78,7 +78,7 @@
 - Added platform-specific tagging examples in the UI
 
 
-## [0.2.0]
+## v0.2.0
 
 ### 🎉 Major Release - All Authentication & Posting Issues Resolved
 
@@ -190,7 +190,7 @@ Users upgrading from previous versions should:
 
 ---
 
-## [0.1.0]
+## v0.1.0
 
 ### 🎉 Initial Release
 
