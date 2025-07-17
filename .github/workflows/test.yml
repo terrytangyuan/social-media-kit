@@ -11,6 +11,7 @@ on:
       - 'jest.config.js'
       - 'babel.config.js'
       - 'tsconfig.json'
+      - '.github/workflows/test.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -21,7 +22,7 @@ on:
       - 'jest.config.js'
       - 'babel.config.js'
       - 'tsconfig.json'
-
+      - '.github/workflows/test.yml'
 jobs:
   unit-tests:
     name: Unit Tests
