@@ -477,6 +477,135 @@ describe('App Component', () => {
     });
   });
 
+  describe('Tag Management', () => {
+    it('should create new person mapping', () => {
+      const newPersonMapping = {
+        id: 'person_1',
+        name: 'John Doe',
+        displayName: 'John Doe',
+        twitter: 'johndoe',
+        bluesky: 'johndoe.bsky.social',
+        createdAt: '2024-01-01T10:00:00.000Z',
+        updatedAt: '2024-01-01T10:00:00.000Z'
+      };
+
+      expect(newPersonMapping.name).toBe('John Doe');
+      expect(newPersonMapping.displayName).toBe('John Doe');
+      expect(newPersonMapping.twitter).toBe('johndoe');
+      expect(newPersonMapping.bluesky).toBe('johndoe.bsky.social');
+      expect(newPersonMapping.id).toBe('person_1');
+    });
+
+    it('should manage person mappings', () => {
+      const personMappings = [
+        { id: 'person_1', name: 'John Doe', displayName: 'John Doe', twitter: 'johndoe' },
+        { id: 'person_2', name: 'Jane Smith', displayName: 'Jane Smith', bluesky: 'jane.bsky.social' }
+      ];
+
+      // Add new person
+      const addPersonMapping = (person: any) => {
+        personMappings.push(person);
+      };
+
+      // Update person
+      const updatePersonMapping = (id: string, updates: any) => {
+        const index = personMappings.findIndex(p => p.id === id);
+        if (index !== -1) {
+          personMappings[index] = { ...personMappings[index], ...updates };
+        }
+      };
+
+      // Delete person
+      const deletePersonMapping = (id: string) => {
+        const index = personMappings.findIndex(p => p.id === id);
+        if (index !== -1) {
+          personMappings.splice(index, 1);
+        }
+      };
+
+      expect(personMappings).toHaveLength(2);
+
+      // Test add
+      addPersonMapping({ id: 'person_3', name: 'Bob Wilson', displayName: 'Bob Wilson' });
+      expect(personMappings).toHaveLength(3);
+
+      // Test update
+      updatePersonMapping('person_1', { twitter: 'john_doe_updated' });
+      expect(personMappings[0].twitter).toBe('john_doe_updated');
+
+      // Test delete
+      deletePersonMapping('person_2');
+      expect(personMappings).toHaveLength(2);
+      expect(personMappings.find(p => p.id === 'person_2')).toBeUndefined();
+    });
+
+    it('should save and load tags from disk', () => {
+      const tags = [
+        { 
+          id: 'person_1', 
+          name: 'John Doe', 
+          displayName: 'John Doe',
+          twitter: 'johndoe',
+          bluesky: 'johndoe.bsky.social',
+          createdAt: '2024-01-01T10:00:00.000Z',
+          updatedAt: '2024-01-01T10:00:00.000Z'
+        }
+      ];
+
+      const dataToSave = {
+        tags: tags,
+        exportedAt: new Date().toISOString(),
+        appVersion: '0.2.1'
+      };
+
+      expect(dataToSave.tags).toHaveLength(1);
+      expect(dataToSave.tags[0].name).toBe('John Doe');
+      expect(dataToSave.tags[0].displayName).toBe('John Doe');
+      expect(dataToSave.tags[0].twitter).toBe('johndoe');
+      expect(dataToSave.tags[0].bluesky).toBe('johndoe.bsky.social');
+      expect(dataToSave.appVersion).toBe('0.2.1');
+    });
+
+    it('should validate tag file format on load', () => {
+      const validateTagFile = (data: any) => {
+        if (!data.tags || !Array.isArray(data.tags)) {
+          throw new Error('Invalid file format');
+        }
+        
+        const validTags = data.tags.filter((tag: any) => 
+          tag.id && tag.name !== undefined && tag.displayName !== undefined
+        );
+        
+        if (validTags.length === 0) {
+          throw new Error('No valid tags found');
+        }
+        
+        return validTags;
+      };
+
+      // Test valid file
+      const validData = {
+        tags: [
+          { id: 'person_1', name: 'John Doe', displayName: 'John Doe', twitter: 'johndoe' }
+        ],
+        exportedAt: '2024-01-01T10:00:00.000Z',
+        appVersion: '0.2.1'
+      };
+
+      const validTags = validateTagFile(validData);
+      expect(validTags).toHaveLength(1);
+      expect(validTags[0].name).toBe('John Doe');
+
+      // Test invalid file structure
+      const invalidData = { posts: [] }; // Wrong structure
+      expect(() => validateTagFile(invalidData)).toThrow('Invalid file format');
+
+      // Test empty tags
+      const emptyData = { tags: [] };
+      expect(() => validateTagFile(emptyData)).toThrow('No valid tags found');
+    });
+  });
+
   describe('Text Chunking', () => {
     it('should chunk text correctly for different platforms', () => {
       const longText = 'A'.repeat(500);

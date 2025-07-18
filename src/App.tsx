@@ -793,6 +793,73 @@ function App() {
     fileInput.click();
   };
 
+  const saveTagsToDisk = () => {
+    const dataToSave = {
+      tags: taggingState.personMappings,
+      exportedAt: new Date().toISOString(),
+      appVersion: "0.2.1"
+    };
+    
+    const dataStr = JSON.stringify(dataToSave, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `social-media-tags-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+
+  const loadTagsFromDisk = () => {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.onchange = (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const data = JSON.parse(content);
+          
+          // Validate the data structure
+          if (!data.tags || !Array.isArray(data.tags)) {
+            alert('❌ Invalid file format. Please select a valid tags backup file.');
+            return;
+          }
+          
+          // Validate each tag has required fields
+          const validTags = data.tags.filter((tag: any) => 
+            tag.id && tag.name !== undefined && tag.displayName !== undefined
+          );
+          
+          if (validTags.length === 0) {
+            alert('❌ No valid tags found in the file.');
+            return;
+          }
+          
+          // Load the tags
+          setTaggingState(prev => ({
+            ...prev,
+            personMappings: validTags
+          }));
+          
+          alert(`✅ Successfully loaded ${validTags.length} person mappings!`);
+        } catch (error) {
+          console.error('Error parsing file:', error);
+          alert('❌ Error reading file. Please make sure it\'s a valid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    };
+    
+    fileInput.click();
+  };
+
   // OAuth configuration functions
   const updateOAuthConfig = (platform: 'linkedin' | 'twitter', clientId: string) => {
     // Note: Client IDs now come from the server (.env file)
@@ -2718,12 +2785,28 @@ function App() {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold">🏷️ Unified Tagging Manager</h2>
-                  <button
-                    onClick={() => setShowTagManager(false)}
-                    className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                  >
-                    ✕
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={loadTagsFromDisk}
+                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                      title="Load tags from file"
+                    >
+                      📁 Load
+                    </button>
+                    <button
+                      onClick={saveTagsToDisk}
+                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
+                      title="Save tags to file"
+                    >
+                      💾 Save
+                    </button>
+                    <button
+                      onClick={() => setShowTagManager(false)}
+                      className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
 
                 {/* Usage Instructions */}
