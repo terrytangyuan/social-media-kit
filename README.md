@@ -48,7 +48,7 @@ More screenshots can be found in [this folder](/screenshots).
 - **Smart Platform Conversion**: Automatically converts to platform-specific formats:
   - LinkedIn: `@Display Name` (manual tagging required after pasting)
   - Twitter/X: `@username` (automatic clickable mentions)
-  - Bluesky: `@handle.domain` (automatic clickable mentions)
+  - Bluesky: `@handle.domain` (automatic clickable mentions with AT Protocol facets)
 - **Person Management**: Add, edit, and delete person mappings with platform-specific handles
 - **Inline Editing**: Edit existing person mappings directly in the tag manager
 - **Visual Tagging Guide**: Clear instructions and examples for each platform
@@ -205,7 +205,7 @@ The built files will be in the `dist` directory.
 - **Platform Conversion**: Automatically converts to platform-specific formats:
   - LinkedIn: `@Yuan Tang` (requires manual @ selection after pasting)
   - Twitter/X: `@TerryTangYuan` (automatic clickable mention)
-  - Bluesky: `@terrytangyuan.xyz` (automatic clickable mention)
+  - Bluesky: `@terrytangyuan.xyz` (automatic clickable mention with AT Protocol facets)
 - **Edit/Delete**: Use the ✏️ Edit and 🗑️ Delete buttons to manage mappings
 
 ### **6. Managing Multiple Posts**

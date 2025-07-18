@@ -1,6 +1,17 @@
 # CHANGELOG
 
+## Under Development
+
+### 🐛 Bug Fixes
+
+#### BlueSky Tagging
+- **Fixed BlueSky mentions not being clickable**: Implemented AT Protocol facets to make mentions properly clickable
+- **Added handle-to-DID resolution**: Automatically resolves BlueSky handles to DIDs for proper mention linking
+- **Smart fallback for missing handles**: When BlueSky handle is not set, properly falls back to display name without trying to resolve it
+- **UTF-8 byte position accuracy**: Correctly calculates byte positions for facets to ensure proper mention detection
+
 ## v0.2.1
+
 
 ### 🏷️ New Features
 

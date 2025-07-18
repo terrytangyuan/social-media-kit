@@ -793,73 +793,6 @@ function App() {
     fileInput.click();
   };
 
-  const saveTagsToDisk = () => {
-    const dataToSave = {
-      tags: taggingState.personMappings,
-      exportedAt: new Date().toISOString(),
-      appVersion: "0.2.1"
-    };
-    
-    const dataStr = JSON.stringify(dataToSave, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(dataBlob);
-    link.download = `social-media-tags-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-  };
-
-  const loadTagsFromDisk = () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json';
-    fileInput.onchange = (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          const data = JSON.parse(content);
-          
-          // Validate the data structure
-          if (!data.tags || !Array.isArray(data.tags)) {
-            alert('❌ Invalid file format. Please select a valid tags backup file.');
-            return;
-          }
-          
-          // Validate each tag has required fields
-          const validTags = data.tags.filter((tag: any) => 
-            tag.id && tag.name !== undefined && tag.displayName !== undefined
-          );
-          
-          if (validTags.length === 0) {
-            alert('❌ No valid tags found in the file.');
-            return;
-          }
-          
-          // Load the tags
-          setTaggingState(prev => ({
-            ...prev,
-            personMappings: validTags
-          }));
-          
-          alert(`✅ Successfully loaded ${validTags.length} person mappings!`);
-        } catch (error) {
-          console.error('Error parsing file:', error);
-          alert('❌ Error reading file. Please make sure it\'s a valid JSON file.');
-        }
-      };
-      reader.readAsText(file);
-    };
-    
-    fileInput.click();
-  };
-
   // OAuth configuration functions
   const updateOAuthConfig = (platform: 'linkedin' | 'twitter', clientId: string) => {
     // Note: Client IDs now come from the server (.env file)
@@ -1244,16 +1177,92 @@ function App() {
     return response.json();
   };
 
+  // Helper function to create facets for BlueSky mentions
+  const createBlueskyFacets = async (text: string, accessToken: string) => {
+    const facets = [];
+    
+    // Convert string to UTF-8 bytes for accurate byte position calculation
+    const encoder = new TextEncoder();
+    const textBytes = encoder.encode(text);
+    
+    // Find all mentions in the text
+    // This regex matches both handles (john.bsky.social) and display names (John Doe)
+    const mentionRegex = /@([a-zA-Z0-9._-]+(?:\.[a-zA-Z0-9._-]+)*|[A-Za-z][A-Za-z0-9\s]*[A-Za-z0-9]?)/g;
+    let match;
+    
+    while ((match = mentionRegex.exec(text)) !== null) {
+      const handle = match[1].trim(); // Extract handle/name without @
+      const mentionText = match[0]; // Full @handle text
+      
+      // Only try to resolve if it looks like a valid BlueSky handle (contains a dot)
+      // Skip display names (like "John Doe") since they can't be resolved to DIDs
+      if (!handle.includes('.')) {
+        console.log(`⏭️ Skipping display name: @${handle} (not a resolvable BlueSky handle)`);
+        continue;
+      }
+      
+      // Calculate byte positions correctly
+      const beforeMention = text.substring(0, match.index);
+      const beforeBytes = encoder.encode(beforeMention);
+      const mentionBytes = encoder.encode(mentionText);
+      
+      const byteStart = beforeBytes.length;
+      const byteEnd = byteStart + mentionBytes.length;
+      
+      try {
+        // Resolve handle to DID using BlueSky API
+        const response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const did = data.did;
+          
+          // Create facet for this mention
+          facets.push({
+            index: {
+              byteStart: byteStart,
+              byteEnd: byteEnd
+            },
+            features: [{
+              $type: 'app.bsky.richtext.facet#mention',
+              did: did
+            }]
+          });
+          
+          console.log(`✅ Resolved @${handle} to DID: ${did}`);
+        } else {
+          console.warn(`⚠️ Could not resolve handle: @${handle}`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error resolving handle @${handle}:`, error);
+      }
+    }
+    
+    return facets;
+  };
+
   const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string, rootUri?: string, rootCid?: string) => {
     const authData = auth.bluesky;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Bluesky');
     }
     
+    // Create facets for mentions to make them clickable
+    const facets = await createBlueskyFacets(content, authData.accessToken);
+    
     const record: any = {
       text: content,
       createdAt: new Date().toISOString()
     };
+    
+    // Add facets if any mentions were found
+    if (facets.length > 0) {
+      record.facets = facets;
+    }
     
     // Add reply field if this is a reply to another post
     if (replyToUri && replyToCid) {
@@ -2785,28 +2794,12 @@ function App() {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold">🏷️ Unified Tagging Manager</h2>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={loadTagsFromDisk}
-                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
-                      title="Load tags from file"
-                    >
-                      📁 Load
-                    </button>
-                    <button
-                      onClick={saveTagsToDisk}
-                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
-                      title="Save tags to file"
-                    >
-                      💾 Save
-                    </button>
-                    <button
-                      onClick={() => setShowTagManager(false)}
-                      className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                    >
-                      ✕
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowTagManager(false)}
+                    className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                  >
+                    ✕
+                  </button>
                 </div>
 
                 {/* Usage Instructions */}
