@@ -93,6 +93,34 @@ const createMockBlueskyFacets = async (text: string, accessToken: string): Promi
       console.warn(`⚠️ Error resolving handle @${handle}:`, error);
     }
   }
+
+  // Find all URLs in the text and create link facets
+  const urlRegex = /https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?]/g;
+  let urlMatch;
+  
+  while ((urlMatch = urlRegex.exec(text)) !== null) {
+    const url = urlMatch[0];
+    
+    // Calculate byte positions for the URL
+    const beforeUrl = text.substring(0, urlMatch.index);
+    const beforeBytes = encoder.encode(beforeUrl);
+    const urlBytes = encoder.encode(url);
+    
+    const byteStart = beforeBytes.length;
+    const byteEnd = byteStart + urlBytes.length;
+    
+    // Create facet for this link
+    facets.push({
+      index: {
+        byteStart: byteStart,
+        byteEnd: byteEnd
+      },
+      features: [{
+        $type: 'app.bsky.richtext.facet#link',
+        uri: url
+      } as any] // Cast to any to handle the type mismatch
+    });
+  }
   
   return facets;
 };
@@ -164,6 +192,47 @@ describe('BlueSky Facets Functionality', () => {
       const match = regex.exec(text);
       expect(match).toBeTruthy();
       expect(match![1]).toBe('terrytangyuan.xyz'); // Should NOT include trailing period
+    });
+
+    it('should detect and handle URLs correctly', async () => {
+      const testCases = [
+        { text: 'Check out https://example.com!', description: 'HTTP URL with punctuation' },
+        { text: 'Visit https://sub.domain.com/path?param=value', description: 'Complex HTTPS URL' },
+        { text: 'Multiple links: https://site1.com and https://site2.org', description: 'Multiple URLs' },
+        { text: 'Mixed: @yuan.tang and https://github.com/user', description: 'URL and mention together' },
+      ];
+
+      for (const testCase of testCases) {
+        const facets = await createMockBlueskyFacets(testCase.text, 'mock-token');
+        
+        // Count URL facets (features with link type)
+        const linkFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+        );
+        
+                 if (testCase.text.includes('Multiple')) {
+           expect(linkFacets.length).toBeGreaterThanOrEqual(2);
+         } else if (testCase.text.includes('https://')) {
+           expect(linkFacets.length).toBeGreaterThanOrEqual(1);
+           // Verify the URI is correctly set
+           const linkFeature = linkFacets[0].features.find(f => f.$type === 'app.bsky.richtext.facet#link');
+           expect(linkFeature).toBeTruthy();
+           expect((linkFeature as any).uri).toMatch(/^https?:\/\//);
+         }
+      }
+    });
+
+    it('should calculate correct byte positions for URLs', async () => {
+      const text = 'Visit https://example.com for more info';
+      const facets = await createMockBlueskyFacets(text, 'mock-token');
+      
+      const linkFacet = facets.find(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+      );
+      
+             expect(linkFacet).toBeTruthy();
+       expect(linkFacet!.index.byteStart).toBe(6); // "Visit " = 6 bytes
+       expect(linkFacet!.index.byteEnd).toBe(25); // "Visit https://example.com" = 25 bytes
     });
 
     it('should handle spacing after punctuation correctly (user-reported issue)', async () => {
@@ -332,6 +401,31 @@ describe('BlueSky Facets Functionality', () => {
       const facets = await createMockBlueskyFacets(longHandle, 'mock-token');
       expect(facets).toHaveLength(1);
     });
+
+    it('should handle URLs at different positions', async () => {
+      const testCases = [
+        'https://example.com at start',
+        'Link in middle https://example.com here',
+        'Link at end https://example.com',
+      ];
+
+      for (const text of testCases) {
+        const facets = await createMockBlueskyFacets(text, 'mock-token');
+        const linkFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+        );
+        expect(linkFacets).toHaveLength(1);
+      }
+    });
+
+    it('should not detect invalid URLs', async () => {
+      const textWithoutValidUrls = 'This has no valid URLs: ftp://example.com, www.example.com, example.com';
+      const facets = await createMockBlueskyFacets(textWithoutValidUrls, 'mock-token');
+      const linkFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+      );
+      expect(linkFacets).toHaveLength(0);
+    });
   });
 
   describe('Performance Edge Cases', () => {
@@ -339,6 +433,15 @@ describe('BlueSky Facets Functionality', () => {
       const mentions = Array.from({ length: 50 }, (_, i) => `@user${i}.test`).join(' ');
       const facets = await createMockBlueskyFacets(mentions, 'mock-token');
       expect(facets).toHaveLength(50);
+    });
+
+    it('should handle text with many URLs', async () => {
+      const urls = Array.from({ length: 10 }, (_, i) => `https://site${i}.com`).join(' ');
+      const facets = await createMockBlueskyFacets(urls, 'mock-token');
+      const linkFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+      );
+      expect(linkFacets).toHaveLength(10);
     });
 
     it('should handle very long text with mentions', async () => {

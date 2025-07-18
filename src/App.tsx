@@ -1244,6 +1244,36 @@ function App() {
         console.warn(`⚠️ Error resolving handle @${handle}:`, error);
       }
     }
+
+    // Find all URLs in the text and create link facets
+    const urlRegex = /https?:\/\/[^\s<>"'`]+[^\s<>"'`.,;:!?]/g;
+    let urlMatch;
+    
+    while ((urlMatch = urlRegex.exec(text)) !== null) {
+      const url = urlMatch[0];
+      
+      // Calculate byte positions for the URL
+      const beforeUrl = text.substring(0, urlMatch.index);
+      const beforeBytes = encoder.encode(beforeUrl);
+      const urlBytes = encoder.encode(url);
+      
+      const byteStart = beforeBytes.length;
+      const byteEnd = byteStart + urlBytes.length;
+      
+      // Create facet for this link
+      facets.push({
+        index: {
+          byteStart: byteStart,
+          byteEnd: byteEnd
+        },
+        features: [{
+          $type: 'app.bsky.richtext.facet#link',
+          uri: url
+        }]
+      });
+      
+      console.log(`🔗 Added clickable link: ${url}`);
+    }
     
     return facets;
   };
