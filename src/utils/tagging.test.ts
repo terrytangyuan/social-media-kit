@@ -225,6 +225,35 @@ describe('Unified Tagging System', () => {
         const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
         expect(converted).toBe('Hello @test.bsky.social!');
       });
+
+      it('should handle mentions followed by punctuation correctly', () => {
+        const testCases = [
+          { input: '@{John Doe}.', expected: '@johndoe.bsky.social.' },
+          { input: '@{John Doe}!', expected: '@johndoe.bsky.social!' },
+          { input: '@{John Doe}?', expected: '@johndoe.bsky.social?' },
+          { input: '@{John Doe},', expected: '@johndoe.bsky.social,' },
+          { input: '@{John Doe};', expected: '@johndoe.bsky.social;' },
+          { input: '@{John Doe}:', expected: '@johndoe.bsky.social:' },
+        ];
+
+        testCases.forEach(({ input, expected }) => {
+          const converted = taggingSystem.convertUnifiedTags(input, 'bluesky');
+          expect(converted).toBe(expected);
+        });
+      });
+
+      it('should handle display name fallbacks with punctuation', () => {
+        const testCases = [
+          { input: '@{Jane Smith}.', expected: '@Jane Smith.' },
+          { input: '@{Jane Smith}!', expected: '@Jane Smith!' },
+          { input: '@{Jane Smith}?', expected: '@Jane Smith?' },
+        ];
+
+        testCases.forEach(({ input, expected }) => {
+          const converted = taggingSystem.convertUnifiedTags(input, 'bluesky');
+          expect(converted).toBe(expected);
+        });
+      });
     });
 
     describe('Case-insensitive matching', () => {

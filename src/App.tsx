@@ -1185,9 +1185,12 @@ function App() {
     const encoder = new TextEncoder();
     const textBytes = encoder.encode(text);
     
-    // Find all mentions in the text
+    // Find all mentions in the text with proper word boundaries
     // This regex matches both handles (john.bsky.social) and display names (John Doe)
-    const mentionRegex = /@([a-zA-Z0-9._-]+(?:\.[a-zA-Z0-9._-]+)*|[A-Za-z][A-Za-z0-9\s]*[A-Za-z0-9]?)/g;
+    // For BlueSky handles: ensures they end with alphanumeric chars, not periods
+    // For display names: allows spaces but must end with alphanumeric
+    // Fixed: Uses word boundary - must be followed by non-word chars, whitespace, punctuation, or end
+    const mentionRegex = /@([a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?)*|[A-Za-z][A-Za-z0-9\s]*[A-Za-z0-9])(?=\s|[.!?,:;]|\b|$)/g;
     let match;
     
     while ((match = mentionRegex.exec(text)) !== null) {

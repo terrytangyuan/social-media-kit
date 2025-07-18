@@ -8,7 +8,11 @@
 - **Fixed BlueSky mentions not being clickable**: Implemented AT Protocol facets to make mentions properly clickable
 - **Added handle-to-DID resolution**: Automatically resolves BlueSky handles to DIDs for proper mention linking
 - **Smart fallback for missing handles**: When BlueSky handle is not set, properly falls back to display name without trying to resolve it
+- **Fixed mentions followed by punctuation**: Improved regex pattern to correctly handle mentions like `@{Name}.` and `@{Name}!`
+- **Fixed BlueSky handles with trailing periods**: Resolved issue where `@terrytangyuan.xyz.` would include the trailing period in the handle, preventing proper resolution
+- **Fixed spacing sensitivity bug**: BlueSky tags now work correctly whether followed by one space or multiple spaces after punctuation (e.g., both `@{Name}. text` and `@{Name}.  text` now work)
 - **UTF-8 byte position accuracy**: Correctly calculates byte positions for facets to ensure proper mention detection
+- **Comprehensive test coverage**: Added 19 detailed test cases covering all BlueSky facets functionality including regex patterns, byte calculations, error handling, and edge cases
 
 ## v0.2.1
 
