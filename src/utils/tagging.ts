@@ -89,7 +89,12 @@ export const createTaggingSystem = (): TaggingSystem => {
       );
 
       if (!person) {
-        // If no mapping found, use display name
+        // If no mapping found, handle based on platform
+        if (platform === 'bluesky' || platform === 'twitter') {
+          // For BlueSky and Twitter, return without @ since unmapped names can't be resolved to handles/DIDs
+          return personName;
+        }
+        // For other platforms (LinkedIn), keep the @ symbol
         return `@${personName}`;
       }
 
@@ -100,11 +105,13 @@ export const createTaggingSystem = (): TaggingSystem => {
         
         case 'twitter':
           // Twitter uses handles (without @)
-          return person.twitter ? `@${person.twitter.replace(/^@/, '')}` : `@${person.displayName}`;
+          // If no twitter handle specified, return display name without @ since it can't be resolved to handle
+          return person.twitter ? `@${person.twitter.replace(/^@/, '')}` : person.displayName;
         
         case 'bluesky':
           // Bluesky uses handles (can include domain)
-          return person.bluesky ? `@${person.bluesky.replace(/^@/, '')}` : `@${person.displayName}`;
+          // If no bluesky handle specified, return display name without @ since it can't be resolved to DID
+          return person.bluesky ? `@${person.bluesky.replace(/^@/, '')}` : person.displayName;
         
         default:
           return `@${person.displayName}`;

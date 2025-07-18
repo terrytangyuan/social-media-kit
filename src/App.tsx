@@ -1915,15 +1915,20 @@ function App() {
             // For LinkedIn, always use display name since manual tagging is required
             return `@${person.displayName}`;
           case 'twitter':
-            return person.twitter ? `@${person.twitter}` : `@${person.displayName}`;
+            return person.twitter ? `@${person.twitter}` : person.displayName;
           case 'bluesky':
-            return person.bluesky ? `@${person.bluesky}` : `@${person.displayName}`;
+            return person.bluesky ? `@${person.bluesky}` : person.displayName;
           default:
             return `@${person.displayName}`;
         }
       }
 
-      // If no mapping found, just return the display name
+      // If no mapping found, handle based on platform
+      if (platform === 'bluesky' || platform === 'twitter') {
+        // For BlueSky and Twitter, return without @ since unmapped names can't be resolved to handles/DIDs
+        return personName;
+      }
+      // For other platforms (LinkedIn), keep the @ symbol
       return `@${personName}`;
     });
 

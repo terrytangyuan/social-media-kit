@@ -185,7 +185,7 @@ describe('Unified Tagging System', () => {
 
         const text = 'Hello @{No Twitter}!';
         const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
-        expect(converted).toBe('Hello @No Twitter User!');
+        expect(converted).toBe('Hello No Twitter User!');
       });
 
       it('should remove @ prefix from Twitter handles', () => {
@@ -211,7 +211,7 @@ describe('Unified Tagging System', () => {
       it('should fallback to display name when no Bluesky handle', () => {
         const text = 'Hello @{Jane Smith}!';
         const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
-        expect(converted).toBe('Hello @Jane Smith!');
+        expect(converted).toBe('Hello Jane Smith!');
       });
 
       it('should remove @ prefix from Bluesky handles', () => {
@@ -244,9 +244,9 @@ describe('Unified Tagging System', () => {
 
       it('should handle display name fallbacks with punctuation', () => {
         const testCases = [
-          { input: '@{Jane Smith}.', expected: '@Jane Smith.' },
-          { input: '@{Jane Smith}!', expected: '@Jane Smith!' },
-          { input: '@{Jane Smith}?', expected: '@Jane Smith?' },
+          { input: '@{Jane Smith}.', expected: 'Jane Smith.' },
+          { input: '@{Jane Smith}!', expected: 'Jane Smith!' },
+          { input: '@{Jane Smith}?', expected: 'Jane Smith?' },
         ];
 
         testCases.forEach(({ input, expected }) => {
@@ -280,7 +280,19 @@ describe('Unified Tagging System', () => {
       it('should handle mixed mapped and unmapped persons', () => {
         const text = 'Hello @{John Doe}, @{Unknown Person}, and @{Jane Smith}!';
         const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
-        expect(converted).toBe('Hello @johndoe, @Unknown Person, and @janesmith123!');
+        expect(converted).toBe('Hello @johndoe, Unknown Person, and @janesmith123!');
+      });
+
+      it('should handle mixed mapped and unmapped persons for BlueSky (no @ for unmapped)', () => {
+        const text = 'Hello @{John Doe}, @{Unknown Person}, and @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'bluesky');
+        expect(converted).toBe('Hello @johndoe.bsky.social, Unknown Person, and Jane Smith!');
+      });
+
+      it('should handle mixed mapped and unmapped persons for Twitter (no @ for unmapped)', () => {
+        const text = 'Hello @{John Doe}, @{Unknown Person}, and @{Jane Smith}!';
+        const converted = taggingSystem.convertUnifiedTags(text, 'twitter');
+        expect(converted).toBe('Hello @johndoe, Unknown Person, and @janesmith123!');
       });
 
       it('should preserve text formatting around tags', () => {

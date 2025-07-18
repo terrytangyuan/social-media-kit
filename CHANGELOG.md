@@ -11,6 +11,9 @@
 - **Fixed mentions followed by punctuation**: Improved regex pattern to correctly handle mentions like `@{Name}.` and `@{Name}!`
 - **Fixed BlueSky handles with trailing periods**: Resolved issue where `@terrytangyuan.xyz.` would include the trailing period in the handle, preventing proper resolution
 - **Fixed spacing sensitivity bug**: BlueSky tags now work correctly whether followed by one space or multiple spaces after punctuation (e.g., both `@{Name}. text` and `@{Name}.  text` now work)
+- **Fixed display name handling**: When no social media handle is specified for a person, unified tags now convert to just the display name without the `@` symbol:
+  - **BlueSky**: `@{John Doe}` becomes `John Doe` instead of `@John Doe` when no BlueSky handle is set
+  - **Twitter**: `@{Jane Smith}` becomes `Jane Smith` instead of `@Jane Smith` when no Twitter handle is set
 - **UTF-8 byte position accuracy**: Correctly calculates byte positions for facets to ensure proper mention detection
 - **Comprehensive test coverage**: Added 19 detailed test cases covering all BlueSky facets functionality including regex patterns, byte calculations, error handling, and edge cases
 
