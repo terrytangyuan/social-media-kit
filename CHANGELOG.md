@@ -11,6 +11,7 @@
 - **Fixed mentions followed by punctuation**: Improved regex pattern to correctly handle mentions like `@{Name}.` and `@{Name}!`
 - **Fixed BlueSky handles with trailing periods**: Resolved issue where `@terrytangyuan.xyz.` would include the trailing period in the handle, preventing proper resolution
 - **Fixed spacing sensitivity bug**: BlueSky tags now work correctly whether followed by one space or multiple spaces after punctuation (e.g., both `@{Name}. text` and `@{Name}.  text` now work)
+- **Added X Premium support**: Toggle option for X Premium accounts to use 25,000 character limit instead of 280 characters
 - **Added clickable links for BlueSky**: URLs in BlueSky posts are now automatically converted to clickable links using AT Protocol facets (supports http:// and https:// URLs)
 - **Fixed display name handling**: When no social media handle is specified for a person, unified tags now convert to just the display name without the `@` symbol:
   - **BlueSky**: `@{John Doe}` becomes `John Doe` instead of `@John Doe` when no BlueSky handle is set

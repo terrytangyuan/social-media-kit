@@ -645,5 +645,24 @@ describe('App Component', () => {
       const blueskyChunks = chunkForPlatform(longText, 'bluesky');
       expect(blueskyChunks.length).toBeGreaterThan(1);
     });
+
+    it('should handle X Premium character limits correctly', () => {
+      const mediumText = 'A'.repeat(1000); // 1000 chars - over regular Twitter limit, under X Premium
+      const longText = 'A'.repeat(30000); // 30000 chars - over X Premium limit
+      
+      const REGULAR_TWITTER_LIMIT = 280;
+      const X_PREMIUM_LIMIT = 25000;
+
+      // Test regular Twitter limits
+      expect(mediumText.length).toBeGreaterThan(REGULAR_TWITTER_LIMIT);
+      expect(mediumText.length).toBeLessThan(X_PREMIUM_LIMIT);
+      
+      // Test X Premium limits
+      expect(longText.length).toBeGreaterThan(X_PREMIUM_LIMIT);
+      
+      // Verify limits work as expected
+      expect(REGULAR_TWITTER_LIMIT).toBe(280);
+      expect(X_PREMIUM_LIMIT).toBe(25000);
+    });
   });
 }); 

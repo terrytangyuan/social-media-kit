@@ -251,7 +251,7 @@ npm run dev
 
 ### Platform Limits
 - **LinkedIn**: 3,000 characters
-- **X/Twitter**: 280 characters (automatically creates threads for longer content)
+- **X/Twitter**: 280 characters (25,000 with X Premium) - automatically creates threads for longer content
 - **Bluesky**: 300 characters
 
 ## 🐛 Troubleshooting

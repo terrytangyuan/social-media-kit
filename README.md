@@ -31,7 +31,7 @@ More screenshots can be found in [this folder](/screenshots).
 
 ### 🌐 **Multi-Platform Support**
 - **LinkedIn**: OAuth 2.0 integration with direct posting (3,000 character limit)
-- **Twitter/X**: OAuth 2.0 authentication with automatic thread creation (280 character limit)
+- **Twitter/X**: OAuth 2.0 authentication with automatic thread creation (280 chars, or 25,000 with X Premium)
 - **Bluesky**: App password authentication with native posting (300 character limit)
 - **Smart Chunking**: Automatic text splitting based on platform-specific character limits
 - **Visual Status**: Green checkmarks (✓) show authentication status for each platform
@@ -161,7 +161,7 @@ The built files will be in the `dist` directory.
 
 1. **⚙️ Setup OAuth** - Configure LinkedIn/Twitter client IDs or Bluesky app password
 2. **✍️ Write Posts** - Use `**bold**`, `_italic_`, and `@{Person Name}` for tagging
-3. **🎯 Select Platform** - Choose LinkedIn, Twitter/X, or Bluesky
+3. **🎯 Select Platform** - Choose LinkedIn, Twitter/X (with optional X Premium), or Bluesky
 4. **📤 Post** - Click "Post to [Platform]" or copy for manual posting
 
 <details>
@@ -189,6 +189,7 @@ The built files will be in the `dist` directory.
 
 ### **4. Platform Selection & Posting**
 - **Select Platform**: Choose from LinkedIn (💼), Twitter/X (🐦), or Bluesky (🦋)
+- **X Premium**: When Twitter/X is selected, toggle "X Premium Account" for 25,000 character limit
 - **Authentication**: Click "Login" if you see a not-connected status
 - **Direct Posting**: Click "Post to [Platform]" to publish directly
 - **Copy Option**: Use "📋 Copy for [Platform]" if you prefer manual posting
@@ -241,7 +242,7 @@ The app converts markdown syntax to Unicode characters that work across all plat
 ### **Smart Text Chunking**
 Automatically splits long content based on platform limits:
 - **LinkedIn**: 3,000 characters (generous limit for long-form content)
-- **Twitter/X**: 280 characters (creates automatic threads)
+- **Twitter/X**: 280 characters (25,000 with X Premium) - creates automatic threads
 - **Bluesky**: 300 characters (creates post series)
 
 Chunking intelligently breaks at:
@@ -259,7 +260,7 @@ Chunking intelligently breaks at:
 
 ### **Platform Character Limits**
 - **LinkedIn**: 3,000 characters (professional long-form posts)
-- **Twitter/X**: 280 characters (concise microblogging)
+- **Twitter/X**: 280 characters (25,000 with X Premium) - microblogging to long-form
 - **Bluesky**: 300 characters (short-form social content)
 
 </details>

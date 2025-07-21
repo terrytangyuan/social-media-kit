@@ -144,9 +144,13 @@ function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoTimeoutRef = useRef<number>();
 
+  // X Premium setting
+  const [isXPremium, setIsXPremium] = useState(false);
+
+  // Dynamic platform limits based on X Premium setting
   const PLATFORM_LIMITS = {
     linkedin: 3000, // LinkedIn doesn't have strict limit, but 3000 is good practice
-    twitter: 280,
+    twitter: isXPremium ? 25000 : 280, // X Premium: 25,000 chars, Regular: 280 chars
     bluesky: 300
   };
 
@@ -183,6 +187,11 @@ function App() {
     const savedAuth = localStorage.getItem("platformAuth");
     const savedOAuthConfig = localStorage.getItem("oauthConfig");
     const savedTagging = localStorage.getItem("unifiedTagging");
+    const savedXPremium = localStorage.getItem("xPremium");
+    
+    if (savedXPremium) {
+      setIsXPremium(JSON.parse(savedXPremium));
+    }
     
     if (savedPosts) {
       const parsedPosts = JSON.parse(savedPosts);
@@ -331,6 +340,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem("unifiedTagging", JSON.stringify(taggingState));
   }, [taggingState]);
+
+  // X Premium setting persistence
+  useEffect(() => {
+    localStorage.setItem("xPremium", JSON.stringify(isXPremium));
+  }, [isXPremium]);
 
   useEffect(() => {
     // Only save to localStorage after the config has been loaded initially
@@ -2484,6 +2498,28 @@ function App() {
             ))}
           </div>
           
+          {/* X Premium Toggle - only show for Twitter */}
+          {selectedPlatform === 'twitter' && (
+            <div className={`mb-3 p-3 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-600" : "bg-gray-50 border-gray-200"}`}>
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    X Premium Account
+                  </span>
+                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    Enable for 25,000 character limit instead of 280
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isXPremium}
+                  onChange={(e) => setIsXPremium(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                />
+              </label>
+            </div>
+          )}
+          
           {/* Authentication Status */}
           <div className={`text-sm mb-3 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
             {auth[selectedPlatform].isAuthenticated ? (
@@ -2518,7 +2554,7 @@ function App() {
           <div className="flex gap-4">
             <span>{text.length} characters</span>
             <span className={`${text.length > PLATFORM_LIMITS[selectedPlatform] ? 'text-red-500' : 'text-green-500'}`}>
-              Limit: {PLATFORM_LIMITS[selectedPlatform]}
+              Limit: {PLATFORM_LIMITS[selectedPlatform]}{selectedPlatform === 'twitter' && isXPremium ? ' (X Premium)' : ''}
             </span>
           </div>
         </div>
