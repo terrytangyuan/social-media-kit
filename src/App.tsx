@@ -2390,9 +2390,12 @@ function App() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-2">
-          <button onClick={() => applyMarkdown("**")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Bold</button>
-          <button onClick={() => applyMarkdown("_")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Italic</button>
+        {/* Show editor only when there's a post to edit */}
+        {currentPostId ? (
+          <>
+            <div className="flex gap-2 mb-2">
+              <button onClick={() => applyMarkdown("**")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Bold</button>
+              <button onClick={() => applyMarkdown("_")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Italic</button>
           <div className="relative emoji-picker-container">
             <button 
               onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
@@ -2689,12 +2692,32 @@ function App() {
           })()}
 
         </div>
+          </>
+        ) : (
+          // Show welcome message when no post is selected
+          <div className={`text-center py-12 ${darkMode ? "bg-gray-700" : "bg-gray-50"} rounded-xl border-2 border-dashed ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">✨</div>
+              <h2 className={`text-xl font-semibold mb-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+                Welcome to Social Media Kit!
+              </h2>
+              <p className={`text-sm mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Create your first post to get started with cross-platform social media management.
+              </p>
+              <button
+                onClick={createNewPost}
+                className={`${darkMode ? "bg-green-600 hover:bg-green-700" : "bg-green-500 hover:bg-green-600"} text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 mx-auto`}
+              >
+                ✏️ Create Your First Post
+              </button>
+              <div className={`mt-6 text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                <p>💡 You can also click "📝 Posts" in the header to manage existing posts</p>
+              </div>
+            </div>
+          </div>
+        )}
 
-
-
-
-
-        {text.trim() && (
+        {currentPostId && text.trim() && (
           <div className="mt-8">
             <h2 className="text-xl font-semibold mb-2">
               {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'} Preview
