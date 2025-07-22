@@ -2377,16 +2377,7 @@ function App() {
               </div>
             )}
             
-            {currentPostId && (
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={saveCurrentPost}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
-                >
-                  💾 Save Current
-                </button>
-              </div>
-            )}
+
           </div>
         )}
 
@@ -2438,14 +2429,46 @@ function App() {
               </div>
             )}
           </div>
-          <button 
-            onClick={() => setShowTagManager(true)} 
-            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
-          >
-            🏷️ Tags
-          </button>
+                        <button 
+                onClick={() => setShowTagManager(true)} 
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
+              >
+                🏷️ Tags
+              </button>
+              <button
+                onClick={() => {
+                  if (!text.trim()) {
+                    alert('❌ Please write some content before saving');
+                    return;
+                  }
+                  
+                  if (!currentPostId) {
+                    // Create new post if no current post
+                    const currentTime = getCurrentDateTimeString();
+                    const newPost = {
+                      id: Date.now().toString(),
+                      title: `Post ${posts.length + 1}`,
+                      content: text,
+                      scheduleTime: scheduleTime || currentTime,
+                      timezone: timezone,
+                      createdAt: new Date().toISOString()
+                    };
+                    setPosts(prev => [...prev, newPost]);
+                    setCurrentPostId(newPost.id);
+                    alert(`✅ Post saved as "${newPost.title}"`);
+                  } else {
+                    // Update existing post
+                    saveCurrentPost();
+                    const currentPost = posts.find(p => p.id === currentPostId);
+                    alert(`✅ Post "${currentPost?.title || 'Untitled'}" updated`);
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm"
+              >
+                💾 Save Current
+              </button>
 
-        </div>
+            </div>
 
         <div className="relative mb-4">
           <textarea
