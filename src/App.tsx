@@ -2868,12 +2868,90 @@ function App() {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold">🏷️ Unified Tagging Manager</h2>
-                  <button
-                    onClick={() => setShowTagManager(false)}
-                    className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                  >
-                    ✕
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const dataToSave = {
+                          taggingData: taggingState,
+                          exportedAt: new Date().toISOString(),
+                          appVersion: "0.2.1"
+                        };
+                        
+                        const dataStr = JSON.stringify(dataToSave, null, 2);
+                        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                        
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(dataBlob);
+                        link.download = `tagging-data-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(link.href);
+                      }}
+                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
+                      title="Save tagging data to file"
+                    >
+                      💾 Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = '.json';
+                        fileInput.onchange = (event) => {
+                          const file = (event.target as HTMLInputElement).files?.[0];
+                          if (!file) return;
+                          
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            try {
+                              const content = e.target?.result as string;
+                              const data = JSON.parse(content);
+                              
+                              // Validate the data structure
+                              if (!data.taggingData || !data.taggingData.personMappings || !Array.isArray(data.taggingData.personMappings)) {
+                                alert('❌ Invalid file format. Please select a valid tagging data backup file.');
+                                return;
+                              }
+                              
+                              // Validate each person mapping has required fields
+                              const validMappings = data.taggingData.personMappings.filter((mapping: any) => 
+                                mapping.id && mapping.name !== undefined && mapping.displayName !== undefined
+                              );
+                              
+                              if (validMappings.length === 0) {
+                                alert('❌ No valid person mappings found in the file.');
+                                return;
+                              }
+                              
+                              // Load the tagging data
+                              setTaggingState({
+                                personMappings: validMappings
+                              });
+                              
+                              alert(`✅ Successfully loaded ${validMappings.length} person mappings!`);
+                            } catch (error) {
+                              console.error('Error parsing file:', error);
+                              alert('❌ Error reading file. Please make sure it\'s a valid JSON file.');
+                            }
+                          };
+                          reader.readAsText(file);
+                        };
+                        
+                        fileInput.click();
+                      }}
+                      className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                      title="Load tagging data from file"
+                    >
+                      📁 Load
+                    </button>
+                    <button
+                      onClick={() => setShowTagManager(false)}
+                      className={`p-2 rounded-lg hover:bg-gray-200 ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
 
                 {/* Usage Instructions */}
