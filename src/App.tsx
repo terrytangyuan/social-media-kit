@@ -302,7 +302,16 @@ function App() {
     
     loadOAuthConfig();
     
-    if (saved) setText(saved);
+    // Check for preserved draft from OAuth flow first
+    const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+    if (preservedDraft) {
+      console.log('🔄 Found preserved draft from OAuth, restoring...');
+      setText(preservedDraft);
+      localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
+    } else if (saved) {
+      setText(saved);
+    }
+    
     if (dark === "true") setDarkMode(true);
     if (schedule) setScheduleTime(schedule);
     if (savedTimezone) setTimezone(savedTimezone);
@@ -456,9 +465,25 @@ function App() {
               
               // Call completion function with fresh config
               await completeOAuthFlow(platform, code, completionConfig);
+              
+              // Restore draft after successful OAuth if no current text
+              const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+              if (preservedDraft && !text.trim()) {
+                console.log('🔄 Restoring preserved draft after OAuth completion');
+                setText(preservedDraft);
+                localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
+              }
             } catch (error) {
               console.error('OAuth completion error:', error);
               alert(`❌ Failed to complete ${platform} authentication: ${error}`);
+              
+              // Restore draft even if OAuth failed
+              const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+              if (preservedDraft && !text.trim()) {
+                console.log('🔄 Restoring preserved draft after OAuth error');
+                setText(preservedDraft);
+                localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
+              }
             }
           } else {
             alert('❌ OAuth Error: Invalid state parameter. Possible security issue.');
@@ -1006,6 +1031,12 @@ function App() {
     
     console.log('✅ Client ID validation passed, proceeding with OAuth');
     
+    // Preserve current draft before OAuth redirect
+    if (text.trim()) {
+      localStorage.setItem('socialMediaDraft_beforeOAuth', text);
+      console.log('💾 Draft preserved before OAuth redirect');
+    }
+    
     const state = Math.random().toString(36).substring(2, 15);
     localStorage.setItem(`oauth_state_${platform}`, state);
     
@@ -1074,6 +1105,9 @@ function App() {
       setShowAuthModal(false);
       setPostingStatus('');
       alert('✅ Successfully authenticated with Bluesky!');
+      
+      // Note: Bluesky auth doesn't involve redirects, so draft should be preserved automatically
+      console.log('✅ Bluesky authentication completed - draft preserved');
     } catch (error) {
       console.error('Bluesky auth error:', error);
       alert('❌ Failed to authenticate with Bluesky. Please check your credentials.');
