@@ -536,6 +536,10 @@ function App() {
     // Save state before making changes
     saveUndoState();
 
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const selected = text.substring(start, end);
@@ -580,6 +584,9 @@ function App() {
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(newStart, newEnd);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
     }, 0);
   };
 
@@ -589,6 +596,10 @@ function App() {
 
     // Save state before making changes
     saveUndoState();
+
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -601,6 +612,9 @@ function App() {
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
     }, 0);
   };
 
@@ -1999,6 +2013,13 @@ function App() {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
+    // Save state before making changes
+    saveUndoState();
+
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const before = text.substring(0, start);
@@ -2006,14 +2027,14 @@ function App() {
 
     const tag = `@{${personName}}`;
     
-    // Save state before making changes
-    saveUndoState();
-    
     setText(before + tag + after);
 
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + tag.length, start + tag.length);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
     }, 0);
   };
 
@@ -2061,6 +2082,10 @@ function App() {
 
     setIsUndoRedoAction(true);
 
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
+
     // Save current state to redo history
     const currentState = {
       text: text,
@@ -2080,6 +2105,9 @@ function App() {
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(previousState.selection.start, previousState.selection.end);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
       setIsUndoRedoAction(false);
     }, 0);
   };
@@ -2091,6 +2119,10 @@ function App() {
     if (!textarea) return;
 
     setIsUndoRedoAction(true);
+
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
 
     // Save current state to undo history
     const currentState = {
@@ -2111,6 +2143,9 @@ function App() {
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(nextState.selection.start, nextState.selection.end);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
       setIsUndoRedoAction(false);
     }, 0);
   };
