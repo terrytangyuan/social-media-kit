@@ -189,6 +189,10 @@ function App() {
     const savedTagging = localStorage.getItem("unifiedTagging");
     const savedXPremium = localStorage.getItem("xPremium");
     
+    // Check for preserved data from OAuth flow
+    const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+    const preservedPostId = localStorage.getItem('currentPostId_beforeOAuth');
+    
     if (savedXPremium) {
       setIsXPremium(JSON.parse(savedXPremium));
     }
@@ -197,7 +201,8 @@ function App() {
       const parsedPosts = JSON.parse(savedPosts);
       setPosts(parsedPosts);
       // If no current post and we have saved posts, use the first one
-      if (parsedPosts.length > 0 && !saved) {
+      // But don't override if we have a preserved post ID from OAuth
+      if (parsedPosts.length > 0 && !saved && !preservedPostId) {
         const firstPost = parsedPosts[0];
         setCurrentPostId(firstPost.id);
         setText(firstPost.content);
@@ -302,14 +307,19 @@ function App() {
     
     loadOAuthConfig();
     
-    // Check for preserved draft from OAuth flow first
-    const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+    // Restore preserved data from OAuth flow first
     if (preservedDraft) {
       console.log('🔄 Found preserved draft from OAuth, restoring...');
       setText(preservedDraft);
       localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
     } else if (saved) {
       setText(saved);
+    }
+    
+    if (preservedPostId) {
+      console.log('🔄 Found preserved post ID from OAuth, restoring...');
+      setCurrentPostId(preservedPostId);
+      localStorage.removeItem('currentPostId_beforeOAuth'); // Clean up
     }
     
     if (dark === "true") setDarkMode(true);
@@ -466,23 +476,39 @@ function App() {
               // Call completion function with fresh config
               await completeOAuthFlow(platform, code, completionConfig);
               
-              // Restore draft after successful OAuth if no current text
-              const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
-              if (preservedDraft && !text.trim()) {
+              // Restore draft and post context after successful OAuth
+              const oauthPreservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+              const oauthPreservedPostId = localStorage.getItem('currentPostId_beforeOAuth');
+              
+              if (oauthPreservedDraft && !text.trim()) {
                 console.log('🔄 Restoring preserved draft after OAuth completion');
-                setText(preservedDraft);
+                setText(oauthPreservedDraft);
                 localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
+              }
+              
+              if (oauthPreservedPostId && !currentPostId) {
+                console.log('🔄 Restoring preserved post ID after OAuth completion');
+                setCurrentPostId(oauthPreservedPostId);
+                localStorage.removeItem('currentPostId_beforeOAuth'); // Clean up
               }
             } catch (error) {
               console.error('OAuth completion error:', error);
               alert(`❌ Failed to complete ${platform} authentication: ${error}`);
               
-              // Restore draft even if OAuth failed
-              const preservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
-              if (preservedDraft && !text.trim()) {
+              // Restore draft and post context even if OAuth failed
+              const oauthErrorPreservedDraft = localStorage.getItem('socialMediaDraft_beforeOAuth');
+              const oauthErrorPreservedPostId = localStorage.getItem('currentPostId_beforeOAuth');
+              
+              if (oauthErrorPreservedDraft && !text.trim()) {
                 console.log('🔄 Restoring preserved draft after OAuth error');
-                setText(preservedDraft);
+                setText(oauthErrorPreservedDraft);
                 localStorage.removeItem('socialMediaDraft_beforeOAuth'); // Clean up
+              }
+              
+              if (oauthErrorPreservedPostId && !currentPostId) {
+                console.log('🔄 Restoring preserved post ID after OAuth error');
+                setCurrentPostId(oauthErrorPreservedPostId);
+                localStorage.removeItem('currentPostId_beforeOAuth'); // Clean up
               }
             }
           } else {
@@ -1031,10 +1057,14 @@ function App() {
     
     console.log('✅ Client ID validation passed, proceeding with OAuth');
     
-    // Preserve current draft before OAuth redirect
+    // Preserve current draft and post context before OAuth redirect
     if (text.trim()) {
       localStorage.setItem('socialMediaDraft_beforeOAuth', text);
       console.log('💾 Draft preserved before OAuth redirect');
+    }
+    if (currentPostId) {
+      localStorage.setItem('currentPostId_beforeOAuth', currentPostId);
+      console.log('💾 Current post ID preserved before OAuth redirect');
     }
     
     const state = Math.random().toString(36).substring(2, 15);
@@ -2466,8 +2496,30 @@ function App() {
           </div>
         )}
 
-        {/* Show editor only when there's a post to edit */}
-        {currentPostId ? (
+        {/* Show editor when there's a post to edit */}
+        {posts.length === 0 ? (
+          // Show welcome message when no posts exist at all
+          <div className={`text-center py-12 ${darkMode ? "bg-gray-700" : "bg-gray-50"} rounded-xl border-2 border-dashed ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">✨</div>
+              <h2 className={`text-xl font-semibold mb-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
+                Welcome to Social Media Kit!
+              </h2>
+              <p className={`text-sm mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Create your first post to get started with cross-platform social media management.
+              </p>
+              <button
+                onClick={createNewPost}
+                className={`${darkMode ? "bg-green-600 hover:bg-green-700" : "bg-green-500 hover:bg-green-600"} text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 mx-auto`}
+              >
+                ✏️ Create Your First Post
+              </button>
+              <div className={`mt-6 text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                <p>💡 You can also click "📝 Posts" in the header to manage existing posts</p>
+              </div>
+            </div>
+          </div>
+        ) : currentPostId ? (
           <>
             <div className="flex gap-2 mb-2">
               <button onClick={() => applyMarkdown("**")} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm">Bold</button>
@@ -2802,24 +2854,29 @@ function App() {
         </div>
           </>
         ) : (
-          // Show welcome message when no post is selected
+          // Show post selection prompt when posts exist but none is selected
           <div className={`text-center py-12 ${darkMode ? "bg-gray-700" : "bg-gray-50"} rounded-xl border-2 border-dashed ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
             <div className="max-w-md mx-auto">
-              <div className="text-6xl mb-4">✨</div>
+              <div className="text-6xl mb-4">📝</div>
               <h2 className={`text-xl font-semibold mb-2 ${darkMode ? "text-white" : "text-gray-800"}`}>
-                Welcome to Social Media Kit!
+                Select a Post to Edit
               </h2>
               <p className={`text-sm mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Create your first post to get started with cross-platform social media management.
+                You have {posts.length} post{posts.length !== 1 ? 's' : ''} saved. Choose one to edit or create a new one.
               </p>
-              <button
-                onClick={createNewPost}
-                className={`${darkMode ? "bg-green-600 hover:bg-green-700" : "bg-green-500 hover:bg-green-600"} text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 mx-auto`}
-              >
-                ✏️ Create Your First Post
-              </button>
-              <div className={`mt-6 text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-                <p>💡 You can also click "📝 Posts" in the header to manage existing posts</p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowPostManager(true)}
+                  className={`${darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"} text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2`}
+                >
+                  📋 Select Post
+                </button>
+                <button
+                  onClick={createNewPost}
+                  className={`${darkMode ? "bg-green-600 hover:bg-green-700" : "bg-green-500 hover:bg-green-600"} text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2`}
+                >
+                  ➕ New Post
+                </button>
               </div>
             </div>
           </div>
