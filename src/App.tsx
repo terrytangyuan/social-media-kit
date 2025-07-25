@@ -177,6 +177,20 @@ function App() {
   const [undoHistory, setUndoHistory] = useState<Array<{ text: string; selection: { start: number; end: number } }>>([]);
   const [redoHistory, setRedoHistory] = useState<Array<{ text: string; selection: { start: number; end: number } }>>([]);
   const [isUndoRedoAction, setIsUndoRedoAction] = useState(false);
+  
+  // Notification state for copy actions
+  const [notification, setNotification] = useState<{
+    message: string;
+    visible: boolean;
+  }>({ message: '', visible: false });
+
+  // Helper function to show notifications
+  const showNotification = (message: string) => {
+    setNotification({ message, visible: true });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, visible: false }));
+    }, 2000); // Hide after 2 seconds
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("socialMediaDraft");
@@ -1852,7 +1866,7 @@ function App() {
         const message = chunks.length > 1 
           ? `✅ ${platform} thread (${chunks.length} parts) copied to clipboard!`
           : `✅ ${platform} post copied to clipboard!`;
-        alert(message);
+        showNotification(message);
       } else {
         // Fallback for older browsers or non-secure contexts
         const textArea = document.createElement("textarea");
@@ -1872,14 +1886,14 @@ function App() {
           const message = chunks.length > 1 
             ? `✅ ${platform} thread (${chunks.length} parts) copied to clipboard!`
             : `✅ ${platform} post copied to clipboard!`;
-          alert(message);
+          showNotification(message);
         } else {
           throw new Error("Copy command failed");
         }
       }
     } catch (err) {
       console.error('Copy failed:', err);
-      alert("❌ Failed to copy text. Please manually copy the text from the preview below.");
+      showNotification("❌ Failed to copy text. Please manually copy the text from the preview below.");
     }
   };
 
@@ -2939,10 +2953,10 @@ function App() {
                                   document.execCommand('copy');
                                   document.body.removeChild(textArea);
                                 }
-                                alert(`✅ Part ${index + 1} copied to clipboard!`);
+                                showNotification(`✅ Part ${index + 1} copied to clipboard!`);
                               } catch (err) {
                                 console.error('Copy failed:', err);
-                                alert('❌ Failed to copy. Please select and copy manually.');
+                                showNotification('❌ Failed to copy. Please select and copy manually.');
                               }
                             }}
                             className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
@@ -3387,6 +3401,23 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* Copy Notification */}
+      {notification.visible && (
+        <div className="fixed top-4 right-4 z-50 animate-fadeIn">
+          <div className={`px-4 py-2 rounded-lg shadow-lg border ${
+            notification.message.includes('❌') 
+              ? darkMode 
+                ? 'bg-red-800 text-red-200 border-red-600' 
+                : 'bg-red-100 text-red-800 border-red-300'
+              : darkMode 
+                ? 'bg-green-800 text-green-200 border-green-600' 
+                : 'bg-green-100 text-green-800 border-green-300'
+          }`}>
+            {notification.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
