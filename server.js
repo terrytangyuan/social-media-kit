@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import mcpRoutes from './api-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('dist'));
+
+// Mount MCP API routes
+app.use('/api/mcp', mcpRoutes);
 
 // OAuth configuration endpoint
 app.get('/api/oauth/config', (req, res) => {

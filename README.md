@@ -265,6 +265,32 @@ Chunking intelligently breaks at:
 
 </details>
 
+## 🤖 MCP API for AI Agents
+
+**NEW**: Complete Model Context Protocol (MCP) compatible API for agentic workflows!
+
+### Quick Start
+```bash
+# Get available tools
+curl http://localhost:3000/api/mcp/tools
+
+# Format text with Unicode styling
+curl -X POST http://localhost:3000/api/mcp/format-text \
+  -H "Content-Type: application/json" \
+  -d '{"text":"**Bold** and _italic_ text"}'
+
+# Test all endpoints
+npm run test:mcp
+```
+
+### Available Tools
+- **Text Processing**: Format, count characters, chunk for threading
+- **Post Management**: Create, read, update, delete posts  
+- **Person Mappings**: Manage unified tagging across platforms
+- **Platform Integration**: Get limits, preview formatted content
+
+📖 **Full Documentation**: [MCP_API.md](MCP_API.md) - Complete API reference with examples and integration patterns
+
 ## 🌟 Pro Tips
 
 - **⚙️ Setup First** - Configure OAuth credentials before posting

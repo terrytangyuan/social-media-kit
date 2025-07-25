@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "social-media-kit": {
+      "command": "node",
+      "args": ["mcp-client.js"],
+      "env": {
+        "API_BASE_URL": "http://localhost:3000/api/mcp"
+      }
+    }
+  }
+} 

@@ -15,6 +15,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:server": "jest --testPathPattern=tests/server",
+    "test:mcp": "node test-mcp-api.js",
+    "mcp-client": "node mcp-client.js",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -26,6 +28,7 @@
     "dompurify": "^3.0.6",
     "express": "^4.18.2",
     "marked": "^12.0.1",
+    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
