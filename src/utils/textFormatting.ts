@@ -31,9 +31,12 @@ export const formatText = (input: string): string => {
     return text.split('').map((char: string) => boldMap[char] || char).join('');
   });
   
-  // Convert _text_ to Unicode italic
-  result = result.replace(/_(.*?)_/g, (match, text) => {
-    return text.split('').map((char: string) => italicMap[char] || char).join('');
+  // Convert _text_ to Unicode italic, but not when part of @ mentions
+  // Use word boundaries to ensure underscores are not part of usernames/handles
+  result = result.replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text, offset) => {
+    const leadingChar = match[0] === '_' ? '' : match[0];
+    const formattedText = text.split('').map((char: string) => italicMap[char] || char).join('');
+    return leadingChar + formattedText;
   });
   
   return result;
@@ -44,7 +47,10 @@ export const formatText = (input: string): string => {
  */
 export const countCharacters = (text: string): number => {
   // Remove formatting markers before counting
-  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/_(.*?)_/g, '$1');
+  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
+    const leadingChar = match[0] === '_' ? '' : match[0];
+    return leadingChar + text;
+  });
   return cleanText.length;
 };
 
@@ -53,7 +59,10 @@ export const countCharacters = (text: string): number => {
  */
 export const countWords = (text: string): number => {
   // Remove formatting markers before counting
-  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/_(.*?)_/g, '$1');
+  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
+    const leadingChar = match[0] === '_' ? '' : match[0];
+    return leadingChar + text;
+  });
   return cleanText.trim().split(/\s+/).filter(word => word.length > 0).length;
 };
 
@@ -61,14 +70,17 @@ export const countWords = (text: string): number => {
  * Check if text contains formatting
  */
 export const hasFormatting = (text: string): boolean => {
-  return /\*\*(.*?)\*\*|_(.*?)_/.test(text);
+  return /\*\*(.*?)\*\*|(?:^|[\s])_([^_]+)_(?=[\s]|$)/.test(text);
 };
 
 /**
  * Remove all formatting from text
  */
 export const removeFormatting = (text: string): string => {
-  return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/_(.*?)_/g, '$1');
+  return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
+    const leadingChar = match[0] === '_' ? '' : match[0];
+    return leadingChar + text;
+  });
 };
 
 /**

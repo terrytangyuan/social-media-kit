@@ -1786,8 +1786,12 @@ function App() {
     // Handle bold text first
     result = result.replace(/\*\*(.*?)\*\*/g, (_, m) => toBold(m));
     
-    // Handle italic text - simpler pattern that works reliably
-    result = result.replace(/_([^_]+?)_/g, (_, m) => toItalic(m));
+    // Handle italic text - avoid formatting underscores in @ mentions
+    // Use word boundaries to ensure underscores are not part of usernames/handles
+    result = result.replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
+      const leadingChar = match[0] === '_' ? '' : match[0];
+      return leadingChar + toItalic(text);
+    });
     
     return result;
   };

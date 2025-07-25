@@ -46,6 +46,23 @@ describe('Text Formatting Utilities', () => {
       expect(formatText('**incomplete')).toBe('**incomplete');
       expect(formatText('_incomplete')).toBe('_incomplete');
     });
+
+    it('should not format underscores in @ mentions', () => {
+      expect(formatText('@_llm_d_')).toBe('@_llm_d_');
+      expect(formatText('@_user_name_')).toBe('@_user_name_');
+      expect(formatText('Hello @_llm_d_ how are you?')).toBe('Hello @_llm_d_ how are you?');
+    });
+
+    it('should still format italic text with word boundaries', () => {
+      expect(formatText('This is _italic_ text')).toBe('This is 𝘪𝘵𝘢𝘭𝘪𝘤 text');
+      expect(formatText('_Start_ of sentence')).toBe('𝘚𝘵𝘢𝘳𝘵 of sentence');
+      expect(formatText('End of _sentence_')).toBe('End of 𝘴𝘦𝘯𝘵𝘦𝘯𝘤𝘦');
+    });
+
+    it('should handle mixed @ mentions and italic formatting', () => {
+      expect(formatText('Hello @_user_ and _italic_ text')).toBe('Hello @_user_ and 𝘪𝘵𝘢𝘭𝘪𝘤 text');
+      expect(formatText('@_username_ says _hello_ world')).toBe('@_username_ says 𝘩𝘦𝘭𝘭𝘰 world');
+    });
   });
 
   describe('countCharacters', () => {
@@ -58,6 +75,12 @@ describe('Text Formatting Utilities', () => {
     it('should count plain text correctly', () => {
       expect(countCharacters('Plain text')).toBe(10);
       expect(countCharacters('')).toBe(0);
+    });
+
+    it('should not count underscores in @ mentions as formatting', () => {
+      expect(countCharacters('@_llm_d_')).toBe(8);
+      expect(countCharacters('Hello @_user_ world')).toBe(19); // Fixed: underscores preserved
+      expect(countCharacters('Text with _italic_ and @_user_')).toBe(28); // Fixed: 'italic' (6) + other text (22)
     });
   });
 
@@ -99,6 +122,17 @@ describe('Text Formatting Utilities', () => {
       expect(hasFormatting('No formatting here')).toBe(false);
       expect(hasFormatting('')).toBe(false);
     });
+
+    it('should not treat @ mentions with underscores as formatting', () => {
+      expect(hasFormatting('@_llm_d_')).toBe(false);
+      expect(hasFormatting('Hello @_user_ world')).toBe(false);
+      expect(hasFormatting('@_username_')).toBe(false);
+    });
+
+    it('should still detect proper italic formatting', () => {
+      expect(hasFormatting('This is _italic_ text')).toBe(true);
+      expect(hasFormatting('_Start_ of sentence')).toBe(true);
+    });
   });
 
   describe('removeFormatting', () => {
@@ -119,6 +153,17 @@ describe('Text Formatting Utilities', () => {
     it('should leave unformatted text unchanged', () => {
       expect(removeFormatting('Plain text')).toBe('Plain text');
       expect(removeFormatting('')).toBe('');
+    });
+
+    it('should preserve @ mentions with underscores', () => {
+      expect(removeFormatting('@_llm_d_')).toBe('@_llm_d_');
+      expect(removeFormatting('Hello @_user_ world')).toBe('Hello @_user_ world');
+      expect(removeFormatting('@_username_')).toBe('@_username_');
+    });
+
+    it('should remove proper italic formatting while preserving @ mentions', () => {
+      expect(removeFormatting('Hello @_user_ and _italic_ text')).toBe('Hello @_user_ and italic text');
+      expect(removeFormatting('_Start_ @_username_ end')).toBe('Start @_username_ end');
     });
   });
 
