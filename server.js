@@ -25,6 +25,8 @@ try {
   console.log('LinkedIn Client Secret loaded:', process.env.LINKEDIN_CLIENT_SECRET ? 'YES' : 'NO');
   console.log('Twitter Client ID loaded:', process.env.TWITTER_CLIENT_ID ? 'YES' : 'NO');
   console.log('Twitter Client Secret loaded:', process.env.TWITTER_CLIENT_SECRET ? 'YES' : 'NO');
+  console.log('Mastodon Client ID loaded:', process.env.MASTODON_CLIENT_ID ? 'YES' : 'NO');
+  console.log('Mastodon Client Secret loaded:', process.env.MASTODON_CLIENT_SECRET ? 'YES' : 'NO');
 } catch (error) {
   console.log('Warning: Could not load .env file:', error.message);
 }
@@ -51,6 +53,12 @@ app.get('/api/oauth/config', (req, res) => {
       scope: 'tweet.read tweet.write users.read',
       authUrl: 'https://twitter.com/i/oauth2/authorize'
     },
+    mastodon: {
+      clientId: process.env.MASTODON_CLIENT_ID || '',
+      redirectUri: req.get('origin') || 'http://localhost:3000',
+      scope: 'read write',
+      instanceUrl: process.env.MASTODON_INSTANCE_URL || 'https://mastodon.social'
+    },
     bluesky: {
       server: 'https://bsky.social'
     }
@@ -61,7 +69,7 @@ app.get('/api/oauth/config', (req, res) => {
 
 // OAuth token exchange endpoint
 app.post('/api/oauth/token', async (req, res) => {
-  const { platform, code, clientId, redirectUri } = req.body;
+  const { platform, code, clientId, redirectUri, instanceUrl } = req.body;
   
   try {
     let tokenUrl;
@@ -199,6 +207,67 @@ app.post('/api/oauth/token', async (req, res) => {
       } catch (profileError) {
         console.error('Error fetching Twitter profile:', profileError);
         tokenData.userProfile = null;
+      }
+    } else if (platform === 'mastodon') {
+      if (!instanceUrl) {
+        throw new Error('Mastodon instance URL is required');
+      }
+      
+      tokenUrl = `${instanceUrl}/oauth/token`;
+      
+      // You need to set the MASTODON_CLIENT_SECRET environment variable
+      const clientSecret = process.env.MASTODON_CLIENT_SECRET;
+      
+      if (!clientSecret) {
+        throw new Error('Mastodon client secret not configured. Please set MASTODON_CLIENT_SECRET environment variable.');
+      }
+      
+      const params = new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        scope: 'read write'
+      });
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params
+      });
+      
+      tokenData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Mastodon token exchange failed: ${tokenData.error_description || tokenData.error}`);
+      }
+      
+      // Fetch user profile from Mastodon API
+      console.log('Fetching Mastodon user profile...');
+      try {
+        const profileResponse = await fetch(`${instanceUrl}/api/v1/accounts/verify_credentials`, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          }
+        });
+        
+        if (profileResponse.ok) {
+          const userProfile = await profileResponse.json();
+          console.log('Mastodon profile fetched successfully');
+          tokenData.userProfile = userProfile;
+          tokenData.instanceUrl = instanceUrl; // Store instance URL for later use
+        } else {
+          console.warn('Failed to fetch Mastodon profile, but token exchange succeeded');
+          tokenData.userProfile = null;
+          tokenData.instanceUrl = instanceUrl;
+        }
+      } catch (profileError) {
+        console.error('Error fetching Mastodon profile:', profileError);
+        tokenData.userProfile = null;
+        tokenData.instanceUrl = instanceUrl;
       }
     } else {
       throw new Error(`Unsupported platform: ${platform}`);
@@ -370,6 +439,60 @@ app.post('/api/twitter/post', async (req, res) => {
     console.error('❌ Twitter posting error:', error);
     res.status(500).json({ 
       error: 'Twitter posting failed', 
+      details: error.message 
+    });
+  }
+});
+
+// Mastodon posting endpoint
+app.post('/api/mastodon/post', async (req, res) => {
+  try {
+    const { content, accessToken, instanceUrl, replyToStatusId } = req.body;
+    
+    if (!content || !accessToken || !instanceUrl) {
+      return res.status(400).json({ error: 'Content, access token, and instance URL are required' });
+    }
+    
+    console.log('📤 Posting to Mastodon via server...');
+    
+    const statusData = {
+      status: content
+    };
+    
+    // Add reply field if this is a reply to another status
+    if (replyToStatusId) {
+      statusData.in_reply_to_id = replyToStatusId;
+    }
+    
+    const response = await fetch(`${instanceUrl}/api/v1/statuses`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(statusData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ Mastodon API error:', response.status, response.statusText, errorData);
+      return res.status(response.status).json({ 
+        error: 'Mastodon API error', 
+        details: errorData,
+        status: response.status,
+        statusText: response.statusText
+      });
+    }
+    
+    const result = await response.json();
+    console.log('✅ Mastodon post successful:', result);
+    
+    res.json({ success: true, data: result });
+    
+  } catch (error) {
+    console.error('❌ Mastodon posting error:', error);
+    res.status(500).json({ 
+      error: 'Mastodon posting failed', 
       details: error.message 
     });
   }

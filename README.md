@@ -2,7 +2,7 @@
 
 *Made with ❤️ for the community*
 
-A comprehensive social media management tool designed to help you create, format, and post content across multiple platforms including LinkedIn, Twitter/X, and Bluesky.
+A comprehensive social media management tool designed to help you create, format, and post content across multiple platforms including LinkedIn, Twitter/X, Mastodon, and Bluesky.
 
 Features advanced styling, tagging, reminder, OAuth authentication, and cross-platform posting capabilities.
 
@@ -17,7 +17,7 @@ More screenshots can be found in [this folder](/screenshots).
 
 ## 🚀 Key Features
 
-- **🌐 Multi-Platform Support** - Post to LinkedIn, Twitter/X, and Bluesky with OAuth authentication
+- **🌐 Multi-Platform Support** - Post to LinkedIn, Twitter/X, Mastodon, and Bluesky with OAuth authentication
 - **✨ Advanced Formatting** - Bold (`**text**`) and italic (`_text_`) with Unicode styling
 - **🏷️ Unified Tagging** - Use `@{Person Name}` syntax for cross-platform tagging
 - **📝 Post Management** - Create, edit, and organize multiple posts with auto-save
@@ -32,6 +32,7 @@ More screenshots can be found in [this folder](/screenshots).
 ### 🌐 **Multi-Platform Support**
 - **LinkedIn**: OAuth 2.0 integration with direct posting (3,000 character limit)
 - **Twitter/X**: OAuth 2.0 authentication with automatic thread creation (280 chars, or 25,000 with X Premium)
+- **Mastodon**: OAuth 2.0 integration with instance-specific authentication and posting (500 character limit, configurable per instance)
 - **Bluesky**: App password authentication with native posting (300 character limit)
 - **Smart Chunking**: Automatic text splitting based on platform-specific character limits
 - **Visual Status**: Green checkmarks (✓) show authentication status for each platform
@@ -48,6 +49,7 @@ More screenshots can be found in [this folder](/screenshots).
 - **Smart Platform Conversion**: Automatically converts to platform-specific formats:
   - LinkedIn: `@Display Name` (manual tagging required after pasting)
   - Twitter/X: `@username` (automatic clickable mentions)
+  - Mastodon: `@username@instance.domain` (automatic clickable mentions)
   - Bluesky: `@handle.domain` (automatic clickable mentions and links with AT Protocol facets)
 - **Person Management**: Add, edit, and delete person mappings with platform-specific handles
 - **Inline Editing**: Edit existing person mappings directly in the tag manager
@@ -58,6 +60,7 @@ More screenshots can be found in [this folder](/screenshots).
 - **Settings UI**: Built-in OAuth configuration panel with step-by-step instructions
 - **LinkedIn OAuth**: OAuth 2.0 with `w_member_social` scope for posting
 - **Twitter OAuth**: OAuth 2.0 with `tweet.read`, `tweet.write`, `users.read` scopes
+- **Mastodon OAuth**: OAuth 2.0 with `read write` scopes, instance-specific configuration
 - **Bluesky Authentication**: Secure app password system
 - **Token Management**: Automatic token storage, persistence, and refresh handling
 
@@ -159,9 +162,9 @@ The built files will be in the `dist` directory.
 
 ## 🎯 Quick Start
 
-1. **⚙️ Setup OAuth** - Configure LinkedIn/Twitter client IDs or Bluesky app password
+1. **⚙️ Setup OAuth** - Configure LinkedIn/Twitter/Mastodon client IDs or Bluesky app password
 2. **✍️ Write Posts** - Use `**bold**`, `_italic_`, and `@{Person Name}` for tagging
-3. **🎯 Select Platform** - Choose LinkedIn, Twitter/X (with optional X Premium), or Bluesky
+3. **🎯 Select Platform** - Choose LinkedIn, Twitter/X (with optional X Premium), Mastodon, or Bluesky
 4. **📤 Post** - Click "Post to [Platform]" or copy for manual posting
 
 <details>
@@ -188,7 +191,7 @@ The built files will be in the `dist` directory.
 - The picker closes automatically after selection
 
 ### **4. Platform Selection & Posting**
-- **Select Platform**: Choose from LinkedIn (💼), Twitter/X (🐦), or Bluesky (🦋)
+- **Select Platform**: Choose from LinkedIn (💼), Twitter/X (🐦), Mastodon (🐘), or Bluesky (🦋)
 - **X Premium**: When Twitter/X is selected, toggle "X Premium Account" for 25,000 character limit
 - **Authentication**: Click "Login" if you see a not-connected status
 - **Direct Posting**: Click "Post to [Platform]" to publish directly
@@ -261,6 +264,7 @@ Chunking intelligently breaks at:
 ### **Platform Character Limits**
 - **LinkedIn**: 3,000 characters (professional long-form posts)
 - **Twitter/X**: 280 characters (25,000 with X Premium) - microblogging to long-form
+- **Mastodon**: 500 characters (configurable per instance) - microblogging with threading support
 - **Bluesky**: 300 characters (short-form social content)
 
 </details>

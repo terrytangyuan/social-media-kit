@@ -16,6 +16,12 @@ type OAuthConfig = {
     scope: string;
     authUrl: string;
   };
+  mastodon: {
+    clientId: string;
+    redirectUri: string;
+    scope: string;
+    instanceUrl: string;
+  };
   bluesky: {
     server: string;
   };
@@ -35,6 +41,12 @@ const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
     scope: 'tweet.read tweet.write users.read',
     authUrl: 'https://twitter.com/i/oauth2/authorize'
   },
+  mastodon: {
+    clientId: '',
+    redirectUri: window.location.origin,
+    scope: 'read write',
+    instanceUrl: 'https://mastodon.social'
+  },
   bluesky: {
     server: 'https://bsky.social'
   }
@@ -51,6 +63,7 @@ type AuthState = {
 type PlatformAuth = {
   linkedin: AuthState & { handle?: string; appPassword?: string };
   twitter: AuthState & { handle?: string; appPassword?: string };
+  mastodon: AuthState & { handle?: string; instanceUrl?: string };
   bluesky: AuthState & { handle?: string; appPassword?: string };
 };
 
@@ -60,6 +73,7 @@ type PersonMapping = {
   name: string;
   displayName: string;
   twitter?: string;
+  mastodon?: string;
   bluesky?: string;
   createdAt: string;
   updatedAt: string;
@@ -99,9 +113,9 @@ function App() {
   }>>([]);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [showPostManager, setShowPostManager] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'bluesky'>('linkedin');
+  const [selectedPlatform, setSelectedPlatform] = useState<'linkedin' | 'twitter' | 'mastodon' | 'bluesky'>('linkedin');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authPlatform, setAuthPlatform] = useState<'linkedin' | 'twitter' | 'bluesky' | null>(null);
+  const [authPlatform, setAuthPlatform] = useState<'linkedin' | 'twitter' | 'mastodon' | 'bluesky' | null>(null);
   const [blueskyCredentials, setBlueskyCredentials] = useState({
     handle: '',
     appPassword: ''
@@ -130,6 +144,15 @@ function App() {
       expiresAt: null,
       userInfo: null
     },
+    mastodon: {
+      isAuthenticated: false,
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      userInfo: null,
+      handle: '',
+      instanceUrl: 'https://mastodon.social'
+    },
     bluesky: {
       isAuthenticated: false,
       accessToken: null,
@@ -151,6 +174,7 @@ function App() {
   const PLATFORM_LIMITS = {
     linkedin: 3000, // LinkedIn doesn't have strict limit, but 3000 is good practice
     twitter: isXPremium ? 25000 : 280, // X Premium: 25,000 chars, Regular: 280 chars
+    mastodon: 500, // Default Mastodon character limit (configurable per instance)
     bluesky: 300
   };
 
@@ -163,6 +187,7 @@ function App() {
     name: '',
     displayName: '',
     twitter: '',
+    mastodon: '',
     bluesky: ''
   });
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
@@ -170,6 +195,7 @@ function App() {
     name: '',
     displayName: '',
     twitter: '',
+    mastodon: '',
     bluesky: ''
   });
 
@@ -228,7 +254,13 @@ function App() {
     if (savedAuth) {
       try {
         const parsedAuth = JSON.parse(savedAuth);
-        setAuth(parsedAuth);
+        // Merge with default auth state to ensure all platforms are present
+        setAuth(prev => ({
+          linkedin: { ...prev.linkedin, ...(parsedAuth.linkedin || {}) },
+          twitter: { ...prev.twitter, ...(parsedAuth.twitter || {}) },
+          mastodon: { ...prev.mastodon, ...(parsedAuth.mastodon || {}) },
+          bluesky: { ...prev.bluesky, ...(parsedAuth.bluesky || {}) }
+        }));
       } catch (error) {
         console.error('Error parsing saved auth:', error);
       }
@@ -259,18 +291,27 @@ function App() {
               const localConfig = JSON.parse(savedOAuthConfig);
               console.log('📋 Merging with localStorage config:', localConfig);
               
-              // Merge configs - server provides LinkedIn/Twitter settings, localStorage provides Bluesky
+              // Merge configs - server provides LinkedIn/Twitter/Mastodon settings, localStorage provides Bluesky and Mastodon instance
               const mergedConfig = {
                 linkedin: {
-                  ...serverConfig.linkedin
+                  ...DEFAULT_OAUTH_CONFIG.linkedin,
+                  ...(serverConfig.linkedin || {})
                   // Client ID always comes from server
                 },
                 twitter: {
-                  ...serverConfig.twitter
+                  ...DEFAULT_OAUTH_CONFIG.twitter,
+                  ...(serverConfig.twitter || {})
                   // Client ID always comes from server
                 },
+                mastodon: {
+                  ...DEFAULT_OAUTH_CONFIG.mastodon,
+                  ...(serverConfig.mastodon || {}),
+                  ...(localConfig.mastodon || {})
+                  // Instance URL can be overridden from localStorage
+                },
                 bluesky: {
-                  ...serverConfig.bluesky,
+                  ...DEFAULT_OAUTH_CONFIG.bluesky,
+                  ...(serverConfig.bluesky || {}),
                   ...(localConfig.bluesky || {})
                 }
               };
@@ -284,7 +325,14 @@ function App() {
             }
           } else {
             console.log('📋 No localStorage config, using server config');
-            setOauthConfig(serverConfig);
+            // Merge server config with defaults to ensure all platforms are present
+            const safeServerConfig = {
+              linkedin: { ...DEFAULT_OAUTH_CONFIG.linkedin, ...(serverConfig.linkedin || {}) },
+              twitter: { ...DEFAULT_OAUTH_CONFIG.twitter, ...(serverConfig.twitter || {}) },
+              mastodon: { ...DEFAULT_OAUTH_CONFIG.mastodon, ...(serverConfig.mastodon || {}) },
+              bluesky: { ...DEFAULT_OAUTH_CONFIG.bluesky, ...(serverConfig.bluesky || {}) }
+            };
+            setOauthConfig(safeServerConfig);
           }
         } else {
           console.warn('⚠️ Failed to load OAuth config from server, using localStorage or defaults');
@@ -306,7 +354,14 @@ function App() {
         if (savedOAuthConfig) {
           try {
             const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
-            setOauthConfig(parsedOAuthConfig);
+            // Merge with defaults to ensure all platforms are present
+            const safeParsedConfig = {
+              linkedin: { ...DEFAULT_OAUTH_CONFIG.linkedin, ...(parsedOAuthConfig.linkedin || {}) },
+              twitter: { ...DEFAULT_OAUTH_CONFIG.twitter, ...(parsedOAuthConfig.twitter || {}) },
+              mastodon: { ...DEFAULT_OAUTH_CONFIG.mastodon, ...(parsedOAuthConfig.mastodon || {}) },
+              bluesky: { ...DEFAULT_OAUTH_CONFIG.bluesky, ...(parsedOAuthConfig.bluesky || {}) }
+            };
+            setOauthConfig(safeParsedConfig);
           } catch (error) {
             console.error('Error parsing saved OAuth config:', error);
             setOauthConfig(DEFAULT_OAUTH_CONFIG);
@@ -443,17 +498,21 @@ function App() {
         console.log('🔧 Using current OAuth config state:', oauthConfig);
         console.log('🔑 Current LinkedIn clientId:', oauthConfig.linkedin.clientId);
         // Determine platform from URL path or state
-        let platform: 'linkedin' | 'twitter' | null = null;
+        let platform: 'linkedin' | 'twitter' | 'mastodon' | null = null;
         if (window.location.pathname.includes('/auth/linkedin')) {
           platform = 'linkedin';
         } else if (window.location.pathname.includes('/auth/twitter')) {
           platform = 'twitter';
+        } else if (window.location.pathname.includes('/auth/mastodon')) {
+          platform = 'mastodon';
         } else {
           // Fallback: check stored state
           const linkedinState = localStorage.getItem('oauth_state_linkedin');
           const twitterState = localStorage.getItem('oauth_state_twitter');
+          const mastodonState = localStorage.getItem('oauth_state_mastodon');
           if (state === linkedinState) platform = 'linkedin';
           else if (state === twitterState) platform = 'twitter';
+          else if (state === mastodonState) platform = 'mastodon';
         }
         
         if (platform) {
@@ -887,7 +946,7 @@ function App() {
   };
 
   // OAuth configuration functions
-  const updateOAuthConfig = (platform: 'linkedin' | 'twitter', clientId: string) => {
+  const updateOAuthConfig = (platform: 'linkedin' | 'twitter' | 'mastodon', clientId: string) => {
     // Note: Client IDs now come from the server (.env file)
     // This function is kept for backward compatibility but doesn't modify client IDs
     console.log('Note: Client IDs are now configured via .env file on the server');
@@ -906,6 +965,16 @@ function App() {
     }));
   };
 
+  const updateMastodonConfig = (instanceUrl: string) => {
+    setOauthConfig(prev => ({
+      ...prev,
+      mastodon: {
+        ...prev.mastodon,
+        instanceUrl
+      }
+    }));
+  };
+
   const clearOAuthLocalStorage = () => {
     if (confirm('⚠️ This will clear all OAuth settings from localStorage and reload the page. Continue?')) {
       localStorage.removeItem('oauthConfig');
@@ -918,7 +987,7 @@ function App() {
   };
 
   // OAuth completion function
-  const completeOAuthFlow = async (platform: 'linkedin' | 'twitter', code: string, explicitConfig?: OAuthConfig) => {
+  const completeOAuthFlow = async (platform: 'linkedin' | 'twitter' | 'mastodon', code: string, explicitConfig?: OAuthConfig) => {
     const config = explicitConfig ? explicitConfig[platform] : oauthConfig[platform];
     
     console.log('OAuth Config for', platform, ':', config);
@@ -949,6 +1018,12 @@ function App() {
         clientId: config.clientId,
         redirectUri: config.redirectUri
       };
+      
+      // Add instance URL for Mastodon
+      if (platform === 'mastodon') {
+        requestBody.instanceUrl = (config as any).instanceUrl;
+        console.log('✅ Added instance URL for Mastodon token exchange:', requestBody.instanceUrl);
+      }
       
       // Add PKCE code verifier for Twitter
       if (platform === 'twitter') {
@@ -998,21 +1073,32 @@ function App() {
       setAuth(prev => ({
         ...prev,
         [platform]: {
+          ...prev[platform], // Preserve existing platform-specific fields
           isAuthenticated: true,
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token || null,
           expiresAt: tokenData.expires_in ? Date.now() + (tokenData.expires_in * 1000) : null,
-          userInfo: userInfo
+          userInfo: userInfo,
+          // Store platform-specific data
+          ...(platform === 'mastodon' && { instanceUrl: tokenData.instanceUrl })
         }
       }));
       
-      alert(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}!`);
+      alert(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : platform === 'twitter' ? 'Twitter' : 'Mastodon'}!`);
       
-      // Clean up Twitter PKCE code verifier
+      // Clean up platform-specific OAuth data
       if (platform === 'twitter') {
         localStorage.removeItem('twitter_code_verifier');
         console.log('🧹 Cleaned up Twitter code verifier');
       }
+      
+      console.log('🎉 OAuth completion successful for', platform);
+      
+      // Ensure localStorage is updated immediately
+      setTimeout(() => {
+        const currentAuth = JSON.parse(localStorage.getItem('platformAuth') || '{}');
+        console.log('🔍 Auth state in localStorage after OAuth:', currentAuth);
+      }, 100);
       
     } catch (error) {
       console.error('OAuth completion error:', error);
@@ -1054,7 +1140,7 @@ function App() {
     return { codeVerifier, codeChallenge };
   };
 
-  const initiateOAuth = async (platform: 'linkedin' | 'twitter') => {
+  const initiateOAuth = async (platform: 'linkedin' | 'twitter' | 'mastodon') => {
     console.log('🚀 Initiating OAuth for', platform);
     console.log('🔧 OAuth config at initiation:', oauthConfig);
     
@@ -1107,7 +1193,17 @@ function App() {
       }
     }
     
-    window.location.href = `${config.authUrl}?${params.toString()}`;
+    // Determine the auth URL based on platform
+    let authUrl: string;
+    if (platform === 'mastodon') {
+      // For Mastodon, construct auth URL using instance URL
+      authUrl = `${(config as any).instanceUrl}/oauth/authorize`;
+    } else {
+      // For LinkedIn and Twitter, use the configured authUrl
+      authUrl = (config as any).authUrl;
+    }
+    
+    window.location.href = `${authUrl}?${params.toString()}`;
   };
 
   const authenticateBluesky = async (handle: string, appPassword: string) => {
@@ -1161,7 +1257,7 @@ function App() {
     }
   };
 
-  const logout = (platform: 'linkedin' | 'twitter' | 'bluesky') => {
+  const logout = (platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky') => {
     setAuth(prev => ({
       ...prev,
       [platform]: {
@@ -1171,7 +1267,8 @@ function App() {
         refreshToken: null,
         expiresAt: null,
         userInfo: null,
-        ...(platform === 'bluesky' && { handle: '', appPassword: '' })
+        ...(platform === 'bluesky' && { handle: '', appPassword: '' }),
+        ...(platform === 'mastodon' && { handle: '', instanceUrl: 'https://mastodon.social' })
       }
     }));
     
@@ -1461,6 +1558,61 @@ function App() {
     return response.json();
   };
 
+  const postToMastodon = async (content: string, replyToStatusId?: string) => {
+    const authData = auth.mastodon;
+    if (!authData.isAuthenticated || !authData.accessToken || !authData.instanceUrl) {
+      throw new Error('Not authenticated with Mastodon');
+    }
+    
+    const requestBody: any = {
+      content,
+      accessToken: authData.accessToken,
+      instanceUrl: authData.instanceUrl
+    };
+    
+    // Add reply field if this is a reply to another status
+    if (replyToStatusId) {
+      requestBody.replyToStatusId = replyToStatusId;
+    }
+    
+    const response = await fetch('/api/mastodon/post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      let errorMessage = `Mastodon API error (${response.status})`;
+      try {
+        const errorData = await response.json();
+        console.error('Mastodon API error details:', errorData);
+        
+        // Handle specific Mastodon error cases
+        if (response.status === 401) {
+          errorMessage = `Mastodon API error: Authentication failed. Your session may have expired. Please reconnect your Mastodon account.`;
+        } else if (response.status === 403) {
+          errorMessage = `Mastodon API error: Permission denied. This might be due to:\n• Account restrictions\n• Invalid access token\n• Server policy violations`;
+        } else if (response.status === 429) {
+          errorMessage = `Mastodon API error: Rate limit exceeded. Please wait before posting again.`;
+        } else if (response.status === 400) {
+          errorMessage = `Mastodon API error: Invalid request. Please check your content.`;
+        } else {
+          errorMessage = `Mastodon API error (${response.status}): ${errorData.details || errorData.error || response.statusText}`;
+        }
+      } catch (parseError) {
+        console.error('Failed to parse Mastodon error response:', parseError);
+        const errorText = await response.text();
+        errorMessage = `Mastodon API error (${response.status}): ${errorText || response.statusText}`;
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    return response.json();
+  };
+
   const handleAutoPost = async () => {
     const authData = auth[selectedPlatform];
     if (!authData.isAuthenticated) {
@@ -1516,6 +1668,13 @@ function App() {
               previousPostCid = result.cid;
             }
             break;
+          case 'mastodon':
+            result = await postToMastodon(chunk, previousPostId);
+            // Extract status ID for next reply
+            if (result?.data?.id) {
+              previousPostId = result.data.id;
+            }
+            break;
           default:
             throw new Error(`Unsupported platform: ${selectedPlatform}`);
         }
@@ -1549,6 +1708,9 @@ function App() {
       } else if (selectedPlatform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('bluesky');
         alert(`❌ Bluesky authentication expired. You have been logged out. Please login again to continue posting.`);
+      } else if (selectedPlatform === 'mastodon' && error instanceof Error && error.message.includes('Authentication failed')) {
+        logout('mastodon');
+        alert(`❌ Mastodon authentication expired. You have been logged out. Please login again to continue posting.`);
       } else {
         alert(`❌ Failed to post to ${selectedPlatform}: ${error}`);
       }
@@ -1559,7 +1721,7 @@ function App() {
   };
 
   const handlePostToAll = async () => {
-    const connectedPlatforms = (['linkedin', 'twitter', 'bluesky'] as const).filter(
+    const connectedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
       platform => auth[platform].isAuthenticated
     );
     
@@ -1571,6 +1733,7 @@ function App() {
     const platformNames = {
       linkedin: 'LinkedIn',
       twitter: 'X/Twitter',
+      mastodon: 'Mastodon',
       bluesky: 'Bluesky'
     };
     
@@ -1629,6 +1792,13 @@ function App() {
                   previousPostCid = result.cid;
                 }
                 break;
+              case 'mastodon':
+                result = await postToMastodon(chunk, previousPostId);
+                // Extract status ID for next reply
+                if (result?.data?.id) {
+                  previousPostId = result.data.id;
+                }
+                break;
             }
             
             // Add delay between posts for multi-part content (increased for Twitter)
@@ -1658,6 +1828,8 @@ function App() {
             logout('linkedin');
           } else if (platform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
             logout('bluesky');
+          } else if (platform === 'mastodon' && error instanceof Error && error.message.includes('Authentication failed')) {
+            logout('mastodon');
           }
           
           results.push({ 
@@ -1705,7 +1877,7 @@ function App() {
     "Symbols": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉️", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳", "🈶", "🈚", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️", "㊗️", "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️", "🆘", "❌", "⭕", "🛑", "⛔", "📛", "🚫", "💯", "💢", "♨️", "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "🚭", "❗", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "〽️", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "✅", "🈯", "💹", "❇️", "✳️", "❎", "🌐", "💠", "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂", "🛃", "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶", "🈁", "🔣", "ℹ️", "🔤", "🔡", "🔠", "🆖", "🆗", "🆙", "🆒", "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟", "🔢", "#️⃣", "*️⃣", "⏏️", "▶️", "⏸️", "⏯️", "⏹️", "⏺️", "⏭️", "⏮️", "⏩", "⏪", "⏫", "⏬", "◀️", "🔼", "🔽", "➡️", "⬅️", "⬆️", "⬇️", "↗️", "↘️", "↙️", "↖️", "↕️", "↔️", "↪️", "↩️", "⤴️", "⤵️", "🔀", "🔁", "🔂", "🔄", "🔃", "🎵", "🎶", "➕", "➖", "➗", "✖️", "♾️", "💲", "💱", "™️", "©️", "®️", "〰️", "➰", "➿", "🔚", "🔙", "🔛", "🔝", "🔜", "✔️", "☑️", "🔘", "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔸", "🔹", "🔶", "🔷", "🔳", "🔲", "▪️", "▫️", "◾", "◽", "◼️", "◻️", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "⬛", "⬜", "🟫", "🔈", "🔇", "🔉", "🔊", "🔔", "🔕", "📣", "📢", "👁️‍🗨️", "💬", "💭", "🗯️", "♠️", "♣️", "♥️", "♦️", "🃏", "🎴", "🀄", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛", "🕜", "🕝", "🕞", "🕟", "🕠", "🕡", "🕢", "🕣", "🕤", "🕥", "🕦", "🕧"]
   };
 
-  const chunkText = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string[] => {
+  const chunkText = (text: string, platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): string[] => {
     const limit = PLATFORM_LIMITS[platform];
     
     if (text.length <= limit) {
@@ -1788,7 +1960,7 @@ function App() {
     return limit;
   };
 
-  const formatForPlatform = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
+  const formatForPlatform = (text: string, platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): string => {
     // First process unified tags, then apply Unicode styling
     const processedText = processUnifiedTags(text, platform);
     return toUnicodeStyle(processedText);
@@ -1990,6 +2162,7 @@ function App() {
       name: '',
       displayName: '',
       twitter: '',
+      mastodon: '',
       bluesky: ''
     });
 
@@ -2025,6 +2198,7 @@ function App() {
         name: person.name,
         displayName: person.displayName,
         twitter: person.twitter || '',
+        mastodon: person.mastodon || '',
         bluesky: person.bluesky || ''
       });
     }
@@ -2038,6 +2212,7 @@ function App() {
         name: '',
         displayName: '',
         twitter: '',
+        mastodon: '',
         bluesky: ''
       });
       alert('✅ Person mapping updated successfully!');
@@ -2050,11 +2225,12 @@ function App() {
       name: '',
       displayName: '',
       twitter: '',
+      mastodon: '',
       bluesky: ''
     });
   };
 
-  const processUnifiedTags = (text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string => {
+  const processUnifiedTags = (text: string, platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): string => {
     let processedText = text;
 
     // Process unified tags like @{Person Name}
@@ -2072,6 +2248,8 @@ function App() {
             return `@${person.displayName}`;
           case 'twitter':
             return person.twitter ? `@${person.twitter}` : person.displayName;
+          case 'mastodon':
+            return person.mastodon ? `@${person.mastodon}` : person.displayName;
           case 'bluesky':
             return person.bluesky ? `@${person.bluesky}` : person.displayName;
           default:
@@ -2080,8 +2258,8 @@ function App() {
       }
 
       // If no mapping found, handle based on platform
-      if (platform === 'bluesky' || platform === 'twitter') {
-        // For BlueSky and Twitter, return without @ since unmapped names can't be resolved to handles/DIDs
+      if (platform === 'bluesky' || platform === 'twitter' || platform === 'mastodon') {
+        // For BlueSky, Twitter, and Mastodon, return without @ since unmapped names can't be resolved to handles/DIDs
         return personName;
       }
       // For other platforms (LinkedIn), keep the @ symbol
@@ -2343,6 +2521,54 @@ function App() {
                         />
                         <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                           {oauthConfig.twitter.clientId ? '✅ Twitter Client ID configured via .env file' : '⚠️ Client ID required - add TWITTER_CLIENT_ID to .env file'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-800 border-gray-600" : "bg-white border-gray-300"} border`}>
+                    <h3 className="font-semibold mb-3">🐘 Mastodon</h3>
+                    <div className="space-y-3">
+                      <div className={`p-3 rounded-md ${darkMode ? "bg-blue-900 text-blue-100" : "bg-blue-50 text-blue-800"}`}>
+                        <h4 className="font-medium text-sm mb-2">📋 Setup Instructions:</h4>
+                        <ol className="text-xs space-y-1">
+                          <li>1. Choose your Mastodon instance (e.g., mastodon.social, mastodon.online)</li>
+                          <li>2. Create a new application in your instance's Developer settings</li>
+                          <li>3. Set redirect URI: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
+                          <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>read write</code></li>
+                          <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>MASTODON_CLIENT_ID</code></li>
+                          <li>6. Set the instance URL below and restart the server</li>
+                        </ol>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Client ID
+                        </label>
+                        <input
+                          type="text"
+                          value={oauthConfig.mastodon.clientId}
+                          onChange={(e) => updateOAuthConfig('mastodon', e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                          placeholder="MastodonClientId123456"
+                          disabled={true}
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {oauthConfig.mastodon.clientId ? '✅ Mastodon Client ID configured via .env file' : '⚠️ Client ID required - add MASTODON_CLIENT_ID to .env file'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Instance URL
+                        </label>
+                        <input
+                          type="text"
+                          value={oauthConfig.mastodon.instanceUrl}
+                          onChange={(e) => updateMastodonConfig(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                          placeholder="https://mastodon.social"
+                        />
+                        <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          🌍 Your Mastodon instance URL (e.g., https://mastodon.social)
                         </p>
                       </div>
                     </div>
@@ -2660,6 +2886,7 @@ function App() {
             {[
               { key: 'linkedin', label: 'LinkedIn', icon: '💼' },
               { key: 'twitter', label: 'X/Twitter', icon: '🐦' },
+              { key: 'mastodon', label: 'Mastodon', icon: '🐘' },
               { key: 'bluesky', label: 'Bluesky', icon: '🦋' }
             ].map((platform) => (
               <button
@@ -2705,7 +2932,7 @@ function App() {
           <div className={`text-sm mb-3 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
             {auth[selectedPlatform].isAuthenticated ? (
               <div className="flex items-center justify-between">
-                <span className="text-green-500">✅ Connected to {selectedPlatform}</span>
+                <span className="text-green-500">✅ Connected to {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}</span>
                 <button
                   onClick={() => logout(selectedPlatform)}
                   className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
@@ -2715,7 +2942,7 @@ function App() {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <span>Not connected to {selectedPlatform}</span>
+                <span>Not connected to {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}</span>
                 <button
                   onClick={() => {
                     setAuthPlatform(selectedPlatform);
@@ -2841,17 +3068,17 @@ function App() {
               disabled={isPosting}
               className={`${isPosting ? 'bg-gray-500' : 'bg-green-600 hover:bg-green-700'} text-white px-4 py-2 rounded-xl flex items-center gap-2`}
             >
-              {isPosting ? '⏳' : '📤'} {isPosting ? 'Posting...' : `Post to ${selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}`}
+                              {isPosting ? '⏳' : '📤'} {isPosting ? 'Posting...' : `Post to ${selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}`}
             </button>
           ) : (
             <button onClick={handleCopyStyled} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl">
-              📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
+              📋 Copy for {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}
             </button>
           )}
           
           {/* Post to All button */}
           {(() => {
-            const connectedPlatforms = (['linkedin', 'twitter', 'bluesky'] as const).filter(
+            const connectedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
               platform => auth[platform].isAuthenticated
             );
             
@@ -2903,7 +3130,7 @@ function App() {
         {currentPostId && text.trim() && (
           <div className="mt-8">
             <h2 className="text-xl font-semibold mb-2">
-              {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'} Preview
+              {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'} Preview
             </h2>
             {selectedPlatform === 'linkedin' && (
               <div className={`text-sm p-3 rounded-lg mb-4 ${darkMode ? "bg-yellow-900 text-yellow-200" : "bg-yellow-100 text-yellow-800"}`}>
@@ -2980,7 +3207,7 @@ function App() {
             <div className={`max-w-md w-full mx-4 p-6 rounded-xl shadow-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">
-                  Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : authPlatform === 'twitter' ? 'X/Twitter' : 'Bluesky'}
+                  Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : authPlatform === 'twitter' ? 'X/Twitter' : authPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}
                 </h2>
                 <button
                   onClick={() => setShowAuthModal(false)}
@@ -3045,14 +3272,14 @@ function App() {
               ) : (
                 <div className="space-y-4">
                   <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                    You will be redirected to {authPlatform === 'linkedin' ? 'LinkedIn' : 'X/Twitter'} to authorize this application.
+                    You will be redirected to {authPlatform === 'linkedin' ? 'LinkedIn' : authPlatform === 'twitter' ? 'X/Twitter' : authPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'} to authorize this application.
                   </p>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => initiateOAuth(authPlatform as 'linkedin' | 'twitter')}
+                      onClick={() => initiateOAuth(authPlatform as 'linkedin' | 'twitter' | 'mastodon')}
                       className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                     >
-                      Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : 'X/Twitter'}
+                      Connect to {authPlatform === 'linkedin' ? 'LinkedIn' : authPlatform === 'twitter' ? 'X/Twitter' : 'Mastodon'}
                     </button>
                     <button
                       onClick={() => setShowAuthModal(false)}
@@ -3209,7 +3436,17 @@ function App() {
                         className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Mastodon (optional)</label>
+                      <input
+                        type="text"
+                        value={newPersonMapping.mastodon}
+                        onChange={(e) => setNewPersonMapping(prev => ({ ...prev, mastodon: e.target.value }))}
+                        placeholder="username@mastodon.social"
+                        className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium mb-1">Bluesky (optional)</label>
                       <input
                         type="text"
@@ -3290,6 +3527,16 @@ function App() {
                                     value={editPersonMapping.twitter}
                                     onChange={(e) => setEditPersonMapping(prev => ({ ...prev, twitter: e.target.value }))}
                                     placeholder="TerryTangYuan"
+                                    className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium mb-1">Mastodon (optional)</label>
+                                  <input
+                                    type="text"
+                                    value={editPersonMapping.mastodon}
+                                    onChange={(e) => setEditPersonMapping(prev => ({ ...prev, mastodon: e.target.value }))}
+                                    placeholder="username@mastodon.social"
                                     className={`w-full p-2 border rounded-lg ${darkMode ? "bg-gray-600 border-gray-500 text-white" : "bg-white border-gray-300 text-gray-800"}`}
                                   />
                                 </div>

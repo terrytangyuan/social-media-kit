@@ -2,7 +2,7 @@
   "name": "social-media-kit",
   "private": true,
   "version": "0.2.1",
-  "description": "A comprehensive social media kit for creating, formatting, and posting content across LinkedIn, Twitter/X, and Bluesky platforms",
+  "description": "A comprehensive social media kit for creating, formatting, and posting content across LinkedIn, Twitter/X, Mastodon, and Bluesky platforms",
   "type": "module",
   "scripts": {
     "dev": "vite",
