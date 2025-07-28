@@ -3598,7 +3598,7 @@ function App() {
                                   </button>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                                 <div>
                                   <span className="font-medium">💼 LinkedIn:</span>
                                   <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
@@ -3609,6 +3609,12 @@ function App() {
                                   <span className="font-medium">🐦 X/Twitter:</span>
                                   <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
                                     {person.twitter ? `@${person.twitter}` : 'Not set'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <span className="font-medium">🐘 Mastodon:</span>
+                                  <p className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                                    {person.mastodon ? `@${person.mastodon}` : 'Not set'}
                                   </p>
                                 </div>
                                 <div>
