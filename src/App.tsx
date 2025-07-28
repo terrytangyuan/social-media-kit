@@ -1973,10 +1973,22 @@ function App() {
     result = result.replace(/\*\*(.*?)\*\*/g, (_, m) => toBold(m));
     
     // Handle italic text - avoid formatting underscores in @ mentions
-    // Use word boundaries to ensure underscores are not part of usernames/handles
-    result = result.replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
-      const leadingChar = match[0] === '_' ? '' : match[0];
-      return leadingChar + toItalic(text);
+    // First, temporarily replace @ mentions to protect them (including those with underscores)
+    const mentionPlaceholders: string[] = [];
+    result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+      const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
+      mentionPlaceholders.push(match);
+      return placeholder;
+    });
+    
+    // Now convert _text_ to italic without worrying about @ mentions
+    result = result.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, (match, text) => {
+      return toItalic(text);
+    });
+    
+    // Restore the @ mentions
+    mentionPlaceholders.forEach((mention, index) => {
+      result = result.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
     });
     
     return result;
