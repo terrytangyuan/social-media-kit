@@ -32,11 +32,22 @@ export const formatText = (input: string): string => {
   });
   
   // Convert _text_ to Unicode italic, but not when part of @ mentions
-  // Use word boundaries to ensure underscores are not part of usernames/handles
-  result = result.replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text, offset) => {
-    const leadingChar = match[0] === '_' ? '' : match[0];
-    const formattedText = text.split('').map((char: string) => italicMap[char] || char).join('');
-    return leadingChar + formattedText;
+  // First, temporarily replace @ mentions to protect them (including those with underscores)
+  const mentionPlaceholders: string[] = [];
+  result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+    const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
+    mentionPlaceholders.push(match);
+    return placeholder;
+  });
+  
+  // Now convert _text_ to italic without worrying about @ mentions
+  result = result.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, (match, text) => {
+    return text.split('').map((char: string) => italicMap[char] || char).join('');
+  });
+  
+  // Restore the @ mentions
+  mentionPlaceholders.forEach((mention, index) => {
+    result = result.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
   });
   
   return result;
@@ -47,10 +58,24 @@ export const formatText = (input: string): string => {
  */
 export const countCharacters = (text: string): number => {
   // Remove formatting markers before counting
-  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
-    const leadingChar = match[0] === '_' ? '' : match[0];
-    return leadingChar + text;
+  let cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  
+  // Temporarily replace @ mentions to protect them (including those with underscores)
+  const mentionPlaceholders: string[] = [];
+  cleanText = cleanText.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+    const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
+    mentionPlaceholders.push(match);
+    return placeholder;
   });
+  
+  // Remove italic formatting
+  cleanText = cleanText.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, '$1');
+  
+  // Restore the @ mentions
+  mentionPlaceholders.forEach((mention, index) => {
+    cleanText = cleanText.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
+  });
+  
   return cleanText.length;
 };
 
@@ -59,10 +84,24 @@ export const countCharacters = (text: string): number => {
  */
 export const countWords = (text: string): number => {
   // Remove formatting markers before counting
-  const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
-    const leadingChar = match[0] === '_' ? '' : match[0];
-    return leadingChar + text;
+  let cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  
+  // Temporarily replace @ mentions to protect them (including those with underscores)
+  const mentionPlaceholders: string[] = [];
+  cleanText = cleanText.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+    const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
+    mentionPlaceholders.push(match);
+    return placeholder;
   });
+  
+  // Remove italic formatting
+  cleanText = cleanText.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, '$1');
+  
+  // Restore the @ mentions
+  mentionPlaceholders.forEach((mention, index) => {
+    cleanText = cleanText.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
+  });
+  
   return cleanText.trim().split(/\s+/).filter(word => word.length > 0).length;
 };
 
@@ -70,17 +109,37 @@ export const countWords = (text: string): number => {
  * Check if text contains formatting
  */
 export const hasFormatting = (text: string): boolean => {
-  return /\*\*(.*?)\*\*|(?:^|[\s])_([^_]+)_(?=[\s]|$)/.test(text);
+  if (/\*\*(.*?)\*\*/.test(text)) return true;
+  
+  // Check for italic formatting, excluding @ mentions
+  let testText = text;
+  testText = testText.replace(/@[a-zA-Z0-9_\.-]+/g, ''); // Remove @ mentions (including those with underscores)
+  return /(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/.test(testText);
 };
 
 /**
  * Remove all formatting from text
  */
 export const removeFormatting = (text: string): string => {
-  return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?:^|[\s])_([^_]+)_(?=[\s]|$)/g, (match, text) => {
-    const leadingChar = match[0] === '_' ? '' : match[0];
-    return leadingChar + text;
+  let result = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  
+  // Temporarily replace @ mentions to protect them (including those with underscores)
+  const mentionPlaceholders: string[] = [];
+  result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+    const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
+    mentionPlaceholders.push(match);
+    return placeholder;
   });
+  
+  // Remove italic formatting
+  result = result.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, '$1');
+  
+  // Restore the @ mentions
+  mentionPlaceholders.forEach((mention, index) => {
+    result = result.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
+  });
+  
+  return result;
 };
 
 /**

@@ -63,6 +63,13 @@ describe('Text Formatting Utilities', () => {
       expect(formatText('Hello @_user_ and _italic_ text')).toBe('Hello @_user_ and 𝘪𝘵𝘢𝘭𝘪𝘤 text');
       expect(formatText('@_username_ says _hello_ world')).toBe('@_username_ says 𝘩𝘦𝘭𝘭𝘰 world');
     });
+
+    it('should format italic text without requiring spaces around it', () => {
+      expect(formatText('_sometext_')).toBe('𝘴𝘰𝘮𝘦𝘵𝘦𝘹𝘵');
+      expect(formatText('text_italic_more')).toBe('text𝘪𝘵𝘢𝘭𝘪𝘤more');
+      expect(formatText('(_italic_)')).toBe('(𝘪𝘵𝘢𝘭𝘪𝘤)');
+      expect(formatText('word_italic_.punctuation')).toBe('word𝘪𝘵𝘢𝘭𝘪𝘤.punctuation');
+    });
   });
 
   describe('countCharacters', () => {
