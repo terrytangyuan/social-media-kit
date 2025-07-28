@@ -31,7 +31,7 @@ const generateId = (): string => {
  * Create a new tagging system instance
  */
 export const createTaggingSystem = (): TaggingSystem => {
-  let personMappings: PersonMapping[] = [];
+  const personMappings: PersonMapping[] = [];
 
   const addPersonMapping = (person: Omit<PersonMapping, 'id' | 'createdAt'>): PersonMapping => {
     const newPerson: PersonMapping = {

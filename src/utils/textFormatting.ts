@@ -34,7 +34,7 @@ export const formatText = (input: string): string => {
   // Convert _text_ to Unicode italic, but not when part of @ mentions
   // First, temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
-  result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+  result = result.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
     mentionPlaceholders.push(match);
     return placeholder;
@@ -62,7 +62,7 @@ export const countCharacters = (text: string): number => {
   
   // Temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
-  cleanText = cleanText.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+  cleanText = cleanText.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
     mentionPlaceholders.push(match);
     return placeholder;
@@ -88,7 +88,7 @@ export const countWords = (text: string): number => {
   
   // Temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
-  cleanText = cleanText.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+  cleanText = cleanText.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
     mentionPlaceholders.push(match);
     return placeholder;
@@ -113,7 +113,7 @@ export const hasFormatting = (text: string): boolean => {
   
   // Check for italic formatting, excluding @ mentions
   let testText = text;
-  testText = testText.replace(/@[a-zA-Z0-9_\.-]+/g, ''); // Remove @ mentions (including those with underscores)
+  testText = testText.replace(/@[a-zA-Z0-9_.-]+/g, ''); // Remove @ mentions (including those with underscores)
   return /(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/.test(testText);
 };
 
@@ -125,7 +125,7 @@ export const removeFormatting = (text: string): string => {
   
   // Temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
-  result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+  result = result.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
     mentionPlaceholders.push(match);
     return placeholder;

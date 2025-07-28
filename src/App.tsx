@@ -1975,7 +1975,7 @@ function App() {
     // Handle italic text - avoid formatting underscores in @ mentions
     // First, temporarily replace @ mentions to protect them (including those with underscores)
     const mentionPlaceholders: string[] = [];
-    result = result.replace(/@[a-zA-Z0-9_\.-]+/g, (match) => {
+    result = result.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
       const placeholder = `MENTIONPLACEHOLDER${mentionPlaceholders.length}PLACEHOLDER`;
       mentionPlaceholders.push(match);
       return placeholder;
