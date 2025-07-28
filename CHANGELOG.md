@@ -2,7 +2,28 @@
 
 ## Under Development
 
+TBA
+
+## v0.2.2
+
+### 🏷️ New Features
+- Added Mastodon support
+- Added X Premium support
+- Automatically convert URLs in BlueSky posts to clickable links using AT Protocol facets
+- Added Welcome page
+- Supports text formatting for numbers and greek letters
+- Added resizer in editor area for longer posts
+
 ### 🐛 Bug Fixes
+
+#### Text Formatting
+- **Fixed italic text formatting not working**: Resolved issue where text was rendered as `_sometext_` instead of converting to italic Unicode characters
+- **Fixed italic formatting with punctuation**: Text formatting now works correctly with exclamation marks and other punctuation (e.g., `_hello!_`, `_text_!`)
+- **Improved regex pattern for italic detection**: Updated from restrictive word-boundary pattern to flexible pattern that works in all contexts while preserving @ mention protection
+
+#### User Interface
+- **Fixed Mastodon handles not displayed after editing**: Added missing Mastodon display section in person mappings view alongside LinkedIn, Twitter, and Bluesky
+- **Improved person mappings layout**: Updated responsive grid from 3-column to 4-column layout to accommodate all platforms
 
 #### BlueSky Tagging
 - **Fixed BlueSky mentions not being clickable**: Implemented AT Protocol facets to make mentions properly clickable
@@ -11,13 +32,11 @@
 - **Fixed mentions followed by punctuation**: Improved regex pattern to correctly handle mentions like `@{Name}.` and `@{Name}!`
 - **Fixed BlueSky handles with trailing periods**: Resolved issue where `@terrytangyuan.xyz.` would include the trailing period in the handle, preventing proper resolution
 - **Fixed spacing sensitivity bug**: BlueSky tags now work correctly whether followed by one space or multiple spaces after punctuation (e.g., both `@{Name}. text` and `@{Name}.  text` now work)
-- **Added X Premium support**: Toggle option for X Premium accounts to use 25,000 character limit instead of 280 characters
-- **Added clickable links for BlueSky**: URLs in BlueSky posts are now automatically converted to clickable links using AT Protocol facets (supports http:// and https:// URLs)
 - **Fixed display name handling**: When no social media handle is specified for a person, unified tags now convert to just the display name without the `@` symbol:
   - **BlueSky**: `@{John Doe}` becomes `John Doe` instead of `@John Doe` when no BlueSky handle is set
   - **Twitter**: `@{Jane Smith}` becomes `Jane Smith` instead of `@Jane Smith` when no Twitter handle is set
 - **UTF-8 byte position accuracy**: Correctly calculates byte positions for facets to ensure proper mention detection
-- **Comprehensive test coverage**: Added 25+ detailed test cases covering all BlueSky facets functionality including mentions, clickable links, regex patterns, byte calculations, error handling, and edge cases
+
 
 ## v0.2.1
 
