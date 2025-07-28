@@ -1,0 +1,14 @@
+{
+  "posts": [
+    {
+      "id": "1752854692634",
+      "title": "About social media kit",
+      "content": "🚀 Excited to share my latest open source project: **Social Media Kit** - A comprehensive tool for managing content across multiple social platforms!\n\n🌟 _It's completely free and open-source_!\n\n🎯 What it does:\n• **Multi-platform support** - LinkedIn, Twitter/X, Bluesky, and Mastodon in one tool\n• **Smart text formatting** - Unicode bold/italic that works everywhere\n• **Intelligent chunking** - Auto-splits long posts based on platform limits\n• **Unified tagging** - Consistent syntax and management for cross-platform tagging\n• **OAuth integration** - Secure authentication for direct posting\n• **Rich emoji picker** - 600+ emojis across 6 categories\n• **Post scheduling** - Set reminders with timezone support\n• **Direct posting** - One-click posting with automatic thread creation\n\n💡 **Why I built this:**\nTired of switching between platforms, dealing with character limits, and losing formatting? This tool streamlines your social media workflow while maintaining consistent branding across all platforms",
+      "scheduleTime": "2025-07-18T12:04",
+      "timezone": "America/New_York",
+      "createdAt": "2025-07-18T16:04:52.634Z"
+    }
+  ],
+  "exportedAt": "2025-07-28T15:08:07.219Z",
+  "appVersion": "0.2.1"
+}

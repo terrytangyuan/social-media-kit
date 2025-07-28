@@ -1,0 +1,72 @@
+{
+  "taggingData": {
+    "personMappings": [
+      {
+        "id": "1752537815226",
+        "name": "Yuan Tang",
+        "displayName": "Yuan Tang",
+        "linkedin": "",
+        "twitter": "TerryTangYuan",
+        "bluesky": "terrytangyuan.xyz",
+        "createdAt": "2025-07-15T00:03:35.226Z",
+        "updatedAt": "2025-07-15T00:44:33.427Z"
+      },
+      {
+        "id": "1752854473311",
+        "name": "argo",
+        "displayName": "Argo",
+        "twitter": "argoproj",
+        "bluesky": "argoproj.bsky.social",
+        "createdAt": "2025-07-18T16:01:13.311Z",
+        "updatedAt": "2025-07-18T16:01:13.311Z"
+      },
+      {
+        "id": "1752854505975",
+        "name": "metaflow",
+        "displayName": "Metaflow",
+        "twitter": "MetaflowOSS",
+        "bluesky": "",
+        "createdAt": "2025-07-18T16:01:45.975Z",
+        "updatedAt": "2025-07-18T16:01:45.975Z"
+      },
+      {
+        "id": "1752854534249",
+        "name": "kubeflow",
+        "displayName": "Kubeflow",
+        "twitter": "kubeflow",
+        "bluesky": "kubefloworg.bsky.social",
+        "createdAt": "2025-07-18T16:02:14.249Z",
+        "updatedAt": "2025-07-18T16:02:14.249Z"
+      },
+      {
+        "id": "1752854765181",
+        "name": "k8s",
+        "displayName": "Kubernetes",
+        "twitter": "kubernetesio",
+        "bluesky": "kubernetes.io",
+        "createdAt": "2025-07-18T16:06:05.181Z",
+        "updatedAt": "2025-07-18T16:06:05.181Z"
+      },
+      {
+        "id": "1753151296276",
+        "name": "PyTorch",
+        "displayName": "PyTorch",
+        "twitter": "pytorch",
+        "bluesky": "",
+        "createdAt": "2025-07-22T02:28:16.276Z",
+        "updatedAt": "2025-07-22T02:28:16.276Z"
+      },
+      {
+        "id": "1753407885333",
+        "name": "llm-d",
+        "displayName": "llm-d",
+        "twitter": "_llm_d_",
+        "bluesky": "",
+        "createdAt": "2025-07-25T01:44:45.333Z",
+        "updatedAt": "2025-07-25T01:44:45.333Z"
+      }
+    ]
+  },
+  "exportedAt": "2025-07-28T15:08:17.584Z",
+  "appVersion": "0.2.1"
+}
