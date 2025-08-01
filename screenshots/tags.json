@@ -64,9 +64,19 @@
         "bluesky": "",
         "createdAt": "2025-07-25T01:44:45.333Z",
         "updatedAt": "2025-07-25T01:44:45.333Z"
+      },
+      {
+        "id": "1754012202798",
+        "name": "CNCF",
+        "displayName": "CNCF",
+        "twitter": "CloudNativeFdn",
+        "mastodon": "",
+        "bluesky": "cncf.io",
+        "createdAt": "2025-08-01T01:36:42.798Z",
+        "updatedAt": "2025-08-01T01:36:42.798Z"
       }
     ]
   },
-  "exportedAt": "2025-07-28T15:08:17.584Z",
+  "exportedAt": "2025-08-01T01:36:45.100Z",
   "appVersion": "0.2.1"
 }

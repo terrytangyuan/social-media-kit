@@ -1477,6 +1477,38 @@ function App() {
       
       console.log(`🔗 Added clickable link: ${url}`);
     }
+
+    // Find all hashtags in the text and create tag facets
+    // Hashtag regex: # followed by alphanumeric/underscore, prevents continuation with word chars, dash, or dot+word
+    const hashtagRegex = /#([a-zA-Z0-9_]+)(?![a-zA-Z0-9_-]|\.[\w])/g;
+    let hashtagMatch;
+    
+    while ((hashtagMatch = hashtagRegex.exec(text)) !== null) {
+      const hashtag = hashtagMatch[1]; // Extract hashtag without #
+      const hashtagText = hashtagMatch[0]; // Full #hashtag text
+      
+      // Calculate byte positions for the hashtag
+      const beforeHashtag = text.substring(0, hashtagMatch.index);
+      const beforeBytes = encoder.encode(beforeHashtag);
+      const hashtagBytes = encoder.encode(hashtagText);
+      
+      const byteStart = beforeBytes.length;
+      const byteEnd = byteStart + hashtagBytes.length;
+      
+      // Create facet for this hashtag
+      facets.push({
+        index: {
+          byteStart: byteStart,
+          byteEnd: byteEnd
+        },
+        features: [{
+          $type: 'app.bsky.richtext.facet#tag',
+          tag: hashtag
+        }]
+      });
+      
+      console.log(`🏷️ Added clickable hashtag: #${hashtag}`);
+    }
     
     return facets;
   };

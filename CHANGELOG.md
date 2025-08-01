@@ -2,7 +2,9 @@
 
 ## Under Development
 
-TBA
+### 🐛 Bug Fixes
+
+- Fixed the issue where hashtags were not clickable in Bluesky posts
 
 ## v0.2.2
 

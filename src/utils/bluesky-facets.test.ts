@@ -121,6 +121,36 @@ const createMockBlueskyFacets = async (text: string, accessToken: string): Promi
       } as any] // Cast to any to handle the type mismatch
     });
   }
+
+  // Find all hashtags in the text and create tag facets
+  // Hashtag regex: # followed by alphanumeric/underscore, prevents continuation with word chars, dash, or dot+word
+  const hashtagRegex = /#([a-zA-Z0-9_]+)(?![a-zA-Z0-9_-]|\.[\w])/g;
+  let hashtagMatch;
+  
+  while ((hashtagMatch = hashtagRegex.exec(text)) !== null) {
+    const hashtag = hashtagMatch[1]; // Extract hashtag without #
+    const hashtagText = hashtagMatch[0]; // Full #hashtag text
+    
+    // Calculate byte positions for the hashtag
+    const beforeHashtag = text.substring(0, hashtagMatch.index);
+    const beforeBytes = encoder.encode(beforeHashtag);
+    const hashtagBytes = encoder.encode(hashtagText);
+    
+    const byteStart = beforeBytes.length;
+    const byteEnd = byteStart + hashtagBytes.length;
+    
+    // Create facet for this hashtag
+    facets.push({
+      index: {
+        byteStart: byteStart,
+        byteEnd: byteEnd
+      },
+      features: [{
+        $type: 'app.bsky.richtext.facet#tag',
+        tag: hashtag
+      } as any] // Cast to any to handle the type mismatch
+    });
+  }
   
   return facets;
 };
@@ -425,6 +455,187 @@ describe('BlueSky Facets Functionality', () => {
         facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
       );
       expect(linkFacets).toHaveLength(0);
+    });
+  });
+
+  describe('Hashtag Detection and Processing', () => {
+    it('should detect single hashtags correctly', async () => {
+      const testCases = [
+        { text: 'This is #awesome!', expected: ['awesome'] },
+        { text: 'Check out #AI technology', expected: ['AI'] },
+        { text: 'Love #javascript coding', expected: ['javascript'] },
+        { text: 'Working on #react_native', expected: ['react_native'] },
+        { text: 'Just #testing123', expected: ['testing123'] },
+      ];
+
+      for (const testCase of testCases) {
+        const facets = await createMockBlueskyFacets(testCase.text, 'mock-token');
+        const tagFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+        );
+        
+        expect(tagFacets).toHaveLength(testCase.expected.length);
+        if (tagFacets.length > 0) {
+          const tagFeature = tagFacets[0].features.find(f => f.$type === 'app.bsky.richtext.facet#tag');
+          expect((tagFeature as any).tag).toBe(testCase.expected[0]);
+        }
+      }
+    });
+
+    it('should detect multiple hashtags in one text', async () => {
+      const text = 'Love #coding and #AI development #javascript';
+      const facets = await createMockBlueskyFacets(text, 'mock-token');
+      const tagFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+      );
+      
+      expect(tagFacets).toHaveLength(3);
+      const tags = tagFacets.map(facet => 
+        (facet.features.find(f => f.$type === 'app.bsky.richtext.facet#tag') as any).tag
+      );
+      expect(tags).toEqual(['coding', 'AI', 'javascript']);
+    });
+
+    it('should calculate correct byte positions for hashtags', async () => {
+      const text = 'Hello #world test';
+      const facets = await createMockBlueskyFacets(text, 'mock-token');
+      
+      const tagFacet = facets.find(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+      );
+      
+      expect(tagFacet).toBeTruthy();
+      expect(tagFacet!.index.byteStart).toBe(6); // "Hello " = 6 bytes
+      expect(tagFacet!.index.byteEnd).toBe(12); // "Hello #world" = 12 bytes
+    });
+
+    it('should handle hashtags at different positions', async () => {
+      const testCases = [
+        { text: '#start of message', description: 'Hashtag at start' },
+        { text: 'Middle #hashtag here', description: 'Hashtag in middle' },
+        { text: 'End of message #end', description: 'Hashtag at end' },
+      ];
+
+      for (const testCase of testCases) {
+        const facets = await createMockBlueskyFacets(testCase.text, 'mock-token');
+        const tagFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+        );
+        expect(tagFacets).toHaveLength(1);
+      }
+    });
+
+    it('should handle hashtags with numbers and underscores', async () => {
+      const testCases = [
+        { text: 'Event #2024conference', expected: '2024conference' },
+        { text: 'Learning #web_development', expected: 'web_development' },
+        { text: 'Using #AI_ML_2024', expected: 'AI_ML_2024' },
+        { text: 'Project #test_123', expected: 'test_123' },
+      ];
+
+      for (const testCase of testCases) {
+        const facets = await createMockBlueskyFacets(testCase.text, 'mock-token');
+        const tagFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+        );
+        
+        expect(tagFacets).toHaveLength(1);
+        const tagFeature = tagFacets[0].features.find(f => f.$type === 'app.bsky.richtext.facet#tag');
+        expect((tagFeature as any).tag).toBe(testCase.expected);
+      }
+    });
+
+    it('should not detect invalid hashtag patterns', async () => {
+      const testCases = [
+        'Just a # symbol',
+        'Hash with space # tag',
+        'Special chars #tag-with-dash',
+        'Hash with dots #tag.with.dots',
+        'Only symbol #',
+      ];
+
+      for (const text of testCases) {
+        const facets = await createMockBlueskyFacets(text, 'mock-token');
+        const tagFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+        );
+        expect(tagFacets).toHaveLength(0);
+      }
+    });
+
+    it('should handle hashtags with punctuation correctly', async () => {
+      const testCases = [
+        { text: 'Great #coding!', expected: 'coding' },
+        { text: 'Love #AI, especially ML', expected: 'AI' },
+        { text: 'Working on #javascript.', expected: 'javascript' },
+        { text: 'Question about #react?', expected: 'react' },
+        { text: 'Check #awesome; amazing', expected: 'awesome' },
+      ];
+
+      for (const testCase of testCases) {
+        const facets = await createMockBlueskyFacets(testCase.text, 'mock-token');
+        const tagFacets = facets.filter(facet => 
+          facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+        );
+        
+        expect(tagFacets).toHaveLength(1);
+        const tagFeature = tagFacets[0].features.find(f => f.$type === 'app.bsky.richtext.facet#tag');
+        expect((tagFeature as any).tag).toBe(testCase.expected);
+      }
+    });
+
+    it('should handle mixed content with hashtags, mentions, and URLs', async () => {
+      const text = 'Hey @test.user check out #coding at https://example.com #awesome';
+      const facets = await createMockBlueskyFacets(text, 'mock-token');
+      
+      const mentionFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#mention')
+      );
+      const linkFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link')
+      );
+      const tagFacets = facets.filter(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+      );
+      
+      expect(mentionFacets).toHaveLength(1); // @test.user
+      expect(linkFacets).toHaveLength(1); // https://example.com
+      expect(tagFacets).toHaveLength(2); // #coding, #awesome
+      
+      const tags = tagFacets.map(facet => 
+        (facet.features.find(f => f.$type === 'app.bsky.richtext.facet#tag') as any).tag
+      );
+      expect(tags).toEqual(['coding', 'awesome']);
+    });
+
+    it('should create properly structured hashtag facets', async () => {
+      const facets = await createMockBlueskyFacets('Testing #hashtag', 'mock-token');
+      const tagFacet = facets.find(facet => 
+        facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#tag')
+      );
+      
+      expect(tagFacet).toBeTruthy();
+      
+      // Check facet structure
+      expect(tagFacet).toHaveProperty('index');
+      expect(tagFacet).toHaveProperty('features');
+      
+      // Check index structure
+      expect(tagFacet!.index).toHaveProperty('byteStart');
+      expect(tagFacet!.index).toHaveProperty('byteEnd');
+      expect(typeof tagFacet!.index.byteStart).toBe('number');
+      expect(typeof tagFacet!.index.byteEnd).toBe('number');
+      expect(tagFacet!.index.byteEnd).toBeGreaterThan(tagFacet!.index.byteStart);
+      
+      // Check features structure
+      expect(Array.isArray(tagFacet!.features)).toBe(true);
+      expect(tagFacet!.features).toHaveLength(1);
+      
+      const feature = tagFacet!.features[0];
+      expect(feature).toHaveProperty('$type');
+      expect(feature).toHaveProperty('tag');
+      expect(feature.$type).toBe('app.bsky.richtext.facet#tag');
+      expect((feature as any).tag).toBe('hashtag');
     });
   });
 
