@@ -3206,7 +3206,7 @@ function App() {
                             Part {index + 1} of {chunks.length} • {chunk.length} characters
                           </div>
                         )}
-                        {(selectedPlatform === 'twitter' || selectedPlatform === 'bluesky') && chunks.length > 1 && (
+                        {(selectedPlatform === 'twitter' || selectedPlatform === 'bluesky' || selectedPlatform === 'mastodon') && chunks.length > 1 && (
                           <button
                             onClick={async () => {
                               try {

@@ -4,7 +4,7 @@
 
 ### 🐛 Bug Fixes
 
-- Fixed the issue where hashtags were not clickable in Bluesky posts
+- **Fixed missing copy button in Mastodon post preview**: Added individual copy buttons for Mastodon thread chunks, bringing it in line with Twitter and Bluesky functionality
 
 ## v0.2.2
 
