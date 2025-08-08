@@ -123,6 +123,13 @@ function App() {
   const [isPosting, setIsPosting] = useState(false);
   const [postingStatus, setPostingStatus] = useState<string>('');
   
+  // Image upload state - updated to support multiple images
+  const [attachedImages, setAttachedImages] = useState<{
+    file: File;
+    dataUrl: string;
+    name: string;
+  }[]>([]);
+  
   // OAuth configuration state
   const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
   const [showOAuthSettings, setShowOAuthSettings] = useState(false);
@@ -177,6 +184,14 @@ function App() {
     mastodon: 500, // Default Mastodon character limit (configurable per instance)
     bluesky: 300
   };
+
+  // Platform image limits
+  const IMAGE_LIMITS = {
+    linkedin: { maxImages: 9, maxFileSize: 5 * 1024 * 1024 }, // 5MB per image
+    twitter: { maxImages: 4, maxFileSize: 5 * 1024 * 1024 }, // 5MB per image  
+    mastodon: { maxImages: 4, maxFileSize: 8 * 1024 * 1024 }, // 8MB per image
+    bluesky: { maxImages: 4, maxFileSize: 10 * 1024 * 1024 } // 10MB per image
+  } as const;
 
   // Add unified tagging state
   const [taggingState, setTaggingState] = useState<TaggingState>({
@@ -1281,7 +1296,7 @@ function App() {
   };
 
   // Posting functions
-  const postToLinkedIn = async (content: string) => {
+  const postToLinkedIn = async (content: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
     const authData = auth.linkedin;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with LinkedIn');
@@ -1290,16 +1305,36 @@ function App() {
     console.log('📤 Posting to LinkedIn...');
     
     // Use our server endpoint to post to LinkedIn (avoids CORS issues) - v2
-    const response = await fetch('/api/linkedin/post', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        content: content,
-        accessToken: authData.accessToken
-      })
-    });
+    let response;
+    if (imageFiles.length > 0) {
+      // Use FormData for image upload
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('accessToken', authData.accessToken);
+      
+      // Add multiple images
+      imageFiles.forEach((imageFile, index) => {
+        formData.append(`image${index}`, imageFile.file);
+      });
+      formData.append('imageCount', imageFiles.length.toString());
+      
+      response = await fetch('/api/linkedin/post', {
+        method: 'POST',
+        body: formData
+      });
+    } else {
+      // JSON request for text-only posts
+      response = await fetch('/api/linkedin/post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content: content,
+          accessToken: authData.accessToken
+        })
+      });
+    }
     
     if (!response.ok) {
       let errorMessage = `LinkedIn API error (${response.status})`;
@@ -1324,29 +1359,54 @@ function App() {
     return response.json();
   };
 
-  const postToTwitter = async (content: string, replyToTweetId?: string) => {
+  const postToTwitter = async (content: string, replyToTweetId?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
     const authData = auth.twitter;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Twitter');
     }
     
-    const requestBody: any = {
-      content,
-      accessToken: authData.accessToken
-    };
-    
-    // Add reply field if this is a reply to another tweet
-    if (replyToTweetId) {
-      requestBody.replyToTweetId = replyToTweetId;
+    let response;
+    if (imageFiles.length > 0) {
+      // Use FormData for image upload
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('accessToken', authData.accessToken);
+      
+      // Add multiple images
+      imageFiles.forEach((imageFile, index) => {
+        formData.append(`image${index}`, imageFile.file);
+      });
+      formData.append('imageCount', imageFiles.length.toString());
+      
+      // Add reply field if this is a reply to another tweet
+      if (replyToTweetId) {
+        formData.append('replyToTweetId', replyToTweetId);
+      }
+      
+      response = await fetch('/api/twitter/post', {
+        method: 'POST',
+        body: formData
+      });
+    } else {
+      // JSON request for text-only posts
+      const requestBody: any = {
+        content,
+        accessToken: authData.accessToken
+      };
+      
+      // Add reply field if this is a reply to another tweet
+      if (replyToTweetId) {
+        requestBody.replyToTweetId = replyToTweetId;
+      }
+      
+      response = await fetch('/api/twitter/post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
     }
-    
-    const response = await fetch('/api/twitter/post', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
     
     if (!response.ok) {
       let errorMessage = `Twitter API error (${response.status})`;
@@ -1513,7 +1573,7 @@ function App() {
     return facets;
   };
 
-  const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string, rootUri?: string, rootCid?: string) => {
+  const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string, rootUri?: string, rootCid?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
     const authData = auth.bluesky;
     if (!authData.isAuthenticated || !authData.accessToken) {
       throw new Error('Not authenticated with Bluesky');
@@ -1530,6 +1590,51 @@ function App() {
     // Add facets if any mentions were found
     if (facets.length > 0) {
       record.facets = facets;
+    }
+
+    // Handle multiple image uploads if provided
+    if (imageFiles.length > 0) {
+      try {
+        const uploadedImages = [];
+        
+        // Upload each image to Bluesky
+        for (const imageFile of imageFiles) {
+          const imageFormData = new FormData();
+          imageFormData.append('file', imageFile.file);
+          
+          const uploadResponse = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authData.accessToken}`,
+            },
+            body: imageFormData
+          });
+
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            uploadedImages.push({
+              alt: `Uploaded image: ${imageFile.name}`,
+              image: uploadData.blob,
+              aspectRatio: {
+                width: 1920, // Default aspect ratio, could be improved
+                height: 1080
+              }
+            });
+          } else {
+            console.warn(`Failed to upload image ${imageFile.name} to Bluesky:`, await uploadResponse.text());
+          }
+        }
+        
+        // Add the images to the record if any uploaded successfully
+        if (uploadedImages.length > 0) {
+          record.embed = {
+            $type: 'app.bsky.embed.images',
+            images: uploadedImages
+          };
+        }
+      } catch (error) {
+        console.warn('Error uploading images to Bluesky:', error);
+      }
     }
     
     // Add reply field if this is a reply to another post
@@ -1590,30 +1695,56 @@ function App() {
     return response.json();
   };
 
-  const postToMastodon = async (content: string, replyToStatusId?: string) => {
+  const postToMastodon = async (content: string, replyToStatusId?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
     const authData = auth.mastodon;
     if (!authData.isAuthenticated || !authData.accessToken || !authData.instanceUrl) {
       throw new Error('Not authenticated with Mastodon');
     }
     
-    const requestBody: any = {
-      content,
-      accessToken: authData.accessToken,
-      instanceUrl: authData.instanceUrl
-    };
-    
-    // Add reply field if this is a reply to another status
-    if (replyToStatusId) {
-      requestBody.replyToStatusId = replyToStatusId;
+    let response;
+    if (imageFiles.length > 0) {
+      // Use FormData for image upload
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('accessToken', authData.accessToken);
+      formData.append('instanceUrl', authData.instanceUrl);
+      
+      // Add multiple images
+      imageFiles.forEach((imageFile, index) => {
+        formData.append(`image${index}`, imageFile.file);
+      });
+      formData.append('imageCount', imageFiles.length.toString());
+      
+      // Add reply field if this is a reply to another status
+      if (replyToStatusId) {
+        formData.append('replyToStatusId', replyToStatusId);
+      }
+      
+      response = await fetch('/api/mastodon/post', {
+        method: 'POST',
+        body: formData
+      });
+    } else {
+      // JSON request for text-only posts
+      const requestBody: any = {
+        content,
+        accessToken: authData.accessToken,
+        instanceUrl: authData.instanceUrl
+      };
+      
+      // Add reply field if this is a reply to another status
+      if (replyToStatusId) {
+        requestBody.replyToStatusId = replyToStatusId;
+      }
+      
+      response = await fetch('/api/mastodon/post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
     }
-    
-    const response = await fetch('/api/mastodon/post', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
     
     if (!response.ok) {
       let errorMessage = `Mastodon API error (${response.status})`;
@@ -1678,17 +1809,17 @@ function App() {
         let result;
         switch (selectedPlatform) {
           case 'linkedin':
-            result = await postToLinkedIn(chunk);
+            result = await postToLinkedIn(chunk, i === 0 ? attachedImages : []);
             break;
           case 'twitter':
-            result = await postToTwitter(chunk, previousPostId);
+            result = await postToTwitter(chunk, previousPostId, i === 0 ? attachedImages : []);
             // Extract tweet ID for next reply
             if (result?.data?.data?.id) {
               previousPostId = result.data.data.id;
             }
             break;
           case 'bluesky':
-            result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid);
+            result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, i === 0 ? attachedImages : []);
             // Extract URI and CID for next reply
             if (result?.uri && result?.cid) {
               // Set root on first post
@@ -1701,7 +1832,7 @@ function App() {
             }
             break;
           case 'mastodon':
-            result = await postToMastodon(chunk, previousPostId);
+            result = await postToMastodon(chunk, previousPostId, i === 0 ? attachedImages : []);
             // Extract status ID for next reply
             if (result?.data?.id) {
               previousPostId = result.data.id;
@@ -1724,8 +1855,9 @@ function App() {
       setPostingStatus('');
       alert(`✅ Successfully posted to ${selectedPlatform}!`);
       
-      // Clear the text after successful posting
+      // Clear the text and images after successful posting
       setText('');
+      setAttachedImages([]);
       
     } catch (error) {
       console.error('Posting error:', error);
@@ -1802,17 +1934,17 @@ function App() {
             let result;
             switch (platform) {
               case 'linkedin':
-                result = await postToLinkedIn(chunk);
+                result = await postToLinkedIn(chunk, i === 0 ? attachedImages : []);
                 break;
               case 'twitter':
-                result = await postToTwitter(chunk, previousPostId);
+                result = await postToTwitter(chunk, previousPostId, i === 0 ? attachedImages : []);
                 // Extract tweet ID for next reply
                 if (result?.data?.data?.id) {
                   previousPostId = result.data.data.id;
                 }
                 break;
               case 'bluesky':
-                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid);
+                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, i === 0 ? attachedImages : []);
                 // Extract URI and CID for next reply
                 if (result?.uri && result?.cid) {
                   // Set root on first post
@@ -1825,7 +1957,7 @@ function App() {
                 }
                 break;
               case 'mastodon':
-                result = await postToMastodon(chunk, previousPostId);
+                result = await postToMastodon(chunk, previousPostId, i === 0 ? attachedImages : []);
                 // Extract status ID for next reply
                 if (result?.data?.id) {
                   previousPostId = result.data.id;
@@ -1879,8 +2011,9 @@ function App() {
       
       if (successful.length === results.length) {
         alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
-        // Clear the text after successful posting to all platforms
+        // Clear the text and images after successful posting to all platforms
         setText('');
+        setAttachedImages([]);
       } else if (successful.length > 0) {
         const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
         const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
@@ -2064,6 +2197,102 @@ function App() {
       Φ: "𝛷", Χ: "𝛸", Ψ: "𝛹", Ω: "𝛺"
     };
     return input.split("").map(c => italicMap[c] || c).join("");
+  };
+
+  // Image handling functions
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // Get platform limits
+    const platformLimit = IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS];
+    
+    // Check if adding these files would exceed the platform limit
+    if (attachedImages.length + files.length > platformLimit.maxImages) {
+      showNotification(`❌ ${selectedPlatform} supports max ${platformLimit.maxImages} images. You currently have ${attachedImages.length} image(s).`);
+      return;
+    }
+
+    const newImages: { file: File; dataUrl: string; name: string; }[] = [];
+    let processedCount = 0;
+
+    Array.from(files).forEach((file) => {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showNotification(`❌ ${file.name} is not a valid image file`);
+        processedCount++;
+        return;
+      }
+
+      // Validate file size based on platform
+      if (file.size > platformLimit.maxFileSize) {
+        const maxSizeMB = (platformLimit.maxFileSize / (1024 * 1024)).toFixed(1);
+        showNotification(`❌ ${file.name} exceeds ${selectedPlatform} size limit of ${maxSizeMB}MB`);
+        processedCount++;
+        return;
+      }
+
+      // Create data URL for preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        newImages.push({
+          file,
+          dataUrl,
+          name: file.name
+        });
+        
+        processedCount++;
+        
+        // Once all files are processed, update state
+        if (processedCount === files.length) {
+          setAttachedImages(prev => [...prev, ...newImages]);
+          const successCount = newImages.length;
+          if (successCount > 0) {
+            showNotification(`✅ ${successCount} image(s) attached successfully`);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset the input
+    event.target.value = '';
+  };
+
+  const removeAttachedImage = (index: number) => {
+    setAttachedImages(prev => prev.filter((_, i) => i !== index));
+    showNotification('🗑️ Image removed');
+  };
+
+  const removeAllAttachedImages = () => {
+    setAttachedImages([]);
+    showNotification('🗑️ All images removed');
+  };
+
+  // Drag and drop reordering for images
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
+    
+    if (dragIndex !== dropIndex) {
+      const newImages = [...attachedImages];
+      const draggedImage = newImages[dragIndex];
+      newImages.splice(dragIndex, 1);
+      newImages.splice(dropIndex, 0, draggedImage);
+      setAttachedImages(newImages);
+      showNotification(`📷 Moved image to position ${dropIndex + 1}`);
+    }
   };
 
   const handleCopyStyled = async () => {
@@ -2922,6 +3151,151 @@ function App() {
           </div>
         </div>
 
+        {/* Image Upload Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              📷 Attach Images (optional)
+            </label>
+            {attachedImages.length > 0 && (
+              <div className="flex gap-2">
+                <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-800"}`}>
+                  {attachedImages.length}/{IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages} images
+                </span>
+                <button
+                  onClick={removeAllAttachedImages}
+                  className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                >
+                  🗑️ Remove All
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Upload area - always visible now */}
+          <div className="relative mb-3">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+              id="image-upload"
+            />
+            <label
+              htmlFor="image-upload"
+              className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                attachedImages.length >= IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages
+                  ? darkMode 
+                    ? "border-gray-700 bg-gray-800 cursor-not-allowed" 
+                    : "border-gray-200 bg-gray-100 cursor-not-allowed"
+                  : darkMode 
+                    ? "border-gray-600 hover:border-gray-500 bg-gray-700 hover:bg-gray-600" 
+                    : "border-gray-300 hover:border-gray-400 bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              <div className="text-center">
+                <div className="text-xl mb-1">📷</div>
+                <div className={`text-xs ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                  {attachedImages.length >= IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages
+                    ? `${selectedPlatform} limit reached`
+                    : `Click to add images (max ${IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages})`
+                  }
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {/* Image previews with enhanced modification controls */}
+          {attachedImages.length > 0 && (
+            <div className="space-y-3">
+              <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                💡 Images will be attached to the first post. Click images to preview, ✕ to remove, or drag to reorder.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {attachedImages.map((image, index) => (
+                  <div 
+                    key={index} 
+                    draggable={attachedImages.length > 1}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index)}
+                    className={`relative group p-3 border rounded-xl transition-all hover:shadow-md ${
+                      attachedImages.length > 1 ? 'cursor-move' : ''
+                    } ${darkMode ? "border-gray-600 bg-gray-700 hover:bg-gray-650" : "border-gray-300 bg-gray-50 hover:bg-gray-100"}`}
+                    title={attachedImages.length > 1 ? "Drag to reorder images" : ""}
+                  >
+                    <div className="flex items-start space-x-3">
+                      {/* Enhanced image preview with click to expand */}
+                      <div className="relative">
+                        <img
+                          src={image.dataUrl}
+                          alt={`Attached image ${index + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg cursor-pointer transition-transform hover:scale-105"
+                          onClick={() => {
+                            // Create modal to show full image
+                            const modal = document.createElement('div');
+                            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 cursor-pointer';
+                            modal.innerHTML = `
+                              <img src="${image.dataUrl}" alt="${image.name}" class="max-w-[90%] max-h-[90%] object-contain rounded-lg" />
+                            `;
+                            modal.addEventListener('click', () => modal.remove());
+                            document.body.appendChild(modal);
+                          }}
+                        />
+                        {/* Image order indicator */}
+                        <div className={`absolute -top-1 -left-1 w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}`}>
+                          {index + 1}
+                        </div>
+                        
+                        {/* Drag handle indicator for multiple images */}
+                        {attachedImages.length > 1 && (
+                          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-70 group-hover:opacity-100 ${darkMode ? "bg-gray-600 text-gray-300" : "bg-gray-400 text-gray-700"}`}>
+                            ⋮⋮
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium text-sm truncate ${darkMode ? "text-white" : "text-gray-800"}`}>
+                          {image.name}
+                        </div>
+                        <div className={`text-xs ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                          {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                        </div>
+                        <div className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                          {image.file.type}
+                        </div>
+                        {index === 0 && (
+                          <div className={`text-xs mt-1 font-medium ${darkMode ? "text-blue-400" : "text-blue-600"}`}>
+                            ✅ Will be posted first
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Enhanced remove button */}
+                    <button
+                      onClick={() => removeAttachedImage(index)}
+                      className={`absolute top-2 right-2 w-7 h-7 rounded-full text-sm flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                      title={`Remove ${image.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Reorder hint for multiple images */}
+              {attachedImages.length > 1 && (
+                <div className={`text-xs ${darkMode ? "text-yellow-400" : "text-yellow-600"} bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded-lg`}>
+                  🔄 Drag and drop to reorder images. The first image (#1) appears in your post.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="mb-4">
           <label className={`block mb-2 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
             Platform
@@ -3237,6 +3611,37 @@ function App() {
                         )}
                       </div>
                       <div className="whitespace-pre-wrap">{chunk}</div>
+                      {/* Show attached images only on first chunk */}
+                      {index === 0 && attachedImages.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              📷 Attached Images ({attachedImages.length}):
+                            </span>
+                          </div>
+                          <div className={`grid gap-3 ${
+                            attachedImages.length === 1 ? 'grid-cols-1' :
+                            attachedImages.length === 2 ? 'grid-cols-2' :
+                            attachedImages.length === 3 ? 'grid-cols-3' :
+                            'grid-cols-2'
+                          }`}>
+                            {attachedImages.map((image, imgIndex) => (
+                              <div key={imgIndex} className="relative">
+                                <img
+                                  src={image.dataUrl}
+                                  alt={`Attached image ${imgIndex + 1}`}
+                                  className="w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600"
+                                  style={{ maxHeight: '200px', objectFit: 'contain' }}
+                                />
+                                {/* Image number overlay */}
+                                <div className={`absolute top-2 left-2 w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white"}`}>
+                                  {imgIndex + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

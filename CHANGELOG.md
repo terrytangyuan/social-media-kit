@@ -2,6 +2,28 @@
 
 ## Under Development
 
+### ✨ New Features
+
+- **Enhanced Image Upload Support**: Complete implementation of multiple image upload to first post
+  - **Multiple Image Upload**: Support for uploading multiple images (up to platform limits)
+  - **Platform-Specific Limits**: Enforced image limits per platform:
+    - LinkedIn: Up to 9 images, 5MB each
+    - Twitter/X: Up to 4 images, 5MB each
+    - Mastodon: Up to 4 images, 8MB each
+    - Bluesky: Up to 4 images, 10MB each
+  - **Enhanced UI**: Modern multi-image selection with grid preview and individual image removal
+  - **Smart Validation**: Real-time validation of file types, sizes, and platform limits
+  - **Interactive Preview**: Click to expand images, drag-and-drop reordering, numbered indicators
+  - **Modification Controls**: Individual remove buttons, remove all option, visual drag handles
+  - **Improved Post Preview**: Smart grid layout adapting to image count with numbered overlays
+  - **Auto-cleanup**: Images automatically cleared after successful posting
+  - **Visual Indicators**: Clear display of current image count vs platform limits with helpful hints
+  - **Platform-Specific Handling**: 
+    - LinkedIn: FormData upload via API with multiple images
+    - Twitter/X: Media upload with multiple image attachment
+    - Mastodon: Media upload with multiple image support
+    - Bluesky: Blob upload with AT Protocol embed for multiple images
+
 ### 🐛 Bug Fixes
 
 - **Fixed missing copy button in Mastodon post preview**: Added individual copy buttons for Mastodon thread chunks, bringing it in line with Twitter and Bluesky functionality
