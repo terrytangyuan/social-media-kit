@@ -110,6 +110,14 @@ function App() {
     scheduleTime: string;
     timezone: string;
     createdAt: string;
+    images?: {
+      file: File;
+      dataUrl: string;
+      name: string;
+    }[];
+    platformImageSelections?: {
+      [key: string]: number[];
+    };
   }>>([]);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [showPostManager, setShowPostManager] = useState(false);
@@ -123,12 +131,26 @@ function App() {
   const [isPosting, setIsPosting] = useState(false);
   const [postingStatus, setPostingStatus] = useState<string>('');
   
-  // Image upload state - updated to support multiple images
+  // Image upload state - updated to support multiple images with platform-specific selection
   const [attachedImages, setAttachedImages] = useState<{
     file: File;
     dataUrl: string;
     name: string;
   }[]>([]);
+  
+  // Platform-specific image selections
+  const [platformImageSelections, setPlatformImageSelections] = useState<{
+    [key: string]: number[]; // Array of indices of selected images for each platform
+  }>({});
+  
+  // Track which platforms have user-made explicit selections
+  const [hasExplicitSelection, setHasExplicitSelection] = useState<{
+    [key: string]: boolean;
+  }>({});
+  
+  // Image selection modal state
+  const [showImageSelector, setShowImageSelector] = useState(false);
+  const [pendingPlatform, setPendingPlatform] = useState<string | null>(null);
   
   // OAuth configuration state
   const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
@@ -847,7 +869,14 @@ function App() {
     
     setPosts(prev => prev.map(post => 
       post.id === currentPostId 
-        ? { ...post, content: text, scheduleTime, timezone }
+        ? { 
+            ...post, 
+            content: text, 
+            scheduleTime, 
+            timezone,
+            images: attachedImages.length > 0 ? attachedImages : undefined,
+            platformImageSelections: Object.keys(platformImageSelections).length > 0 ? platformImageSelections : undefined
+          }
         : post
     ));
   };
@@ -864,6 +893,11 @@ function App() {
       setText(post.content);
       setScheduleTime(post.scheduleTime);
       setTimezone(post.timezone);
+      
+      // Restore images and platform selections
+      setAttachedImages(post.images || []);
+      setPlatformImageSelections(post.platformImageSelections || {});
+      setHasExplicitSelection({}); // Reset explicit selection tracking
     }
   };
 
@@ -888,10 +922,25 @@ function App() {
   };
 
   const savePostsToDisk = () => {
+    // Auto-save current post before exporting
+    if (currentPostId) {
+      saveCurrentPost();
+    }
+    
+    // Convert posts with File objects to serializable format
+    const serializablePosts = posts.map(post => ({
+      ...post,
+      images: post.images?.map(img => ({
+        dataUrl: img.dataUrl,
+        name: img.name,
+        // Note: File object is not serializable, but dataUrl contains the image data
+      }))
+    }));
+    
     const dataToSave = {
-      posts: posts,
+      posts: serializablePosts,
       exportedAt: new Date().toISOString(),
-              appVersion: "0.2.1"
+      appVersion: "0.2.1"
     };
     
     const dataStr = JSON.stringify(dataToSave, null, 2);
@@ -936,19 +985,47 @@ function App() {
             return;
           }
           
+          // Convert image data back to File objects
+          const postsWithFiles = validPosts.map((post: any) => ({
+            ...post,
+            images: post.images?.map((img: any) => {
+              // Convert dataUrl back to File object
+              const dataUrl = img.dataUrl;
+              const arr = dataUrl.split(',');
+              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+              const bstr = atob(arr[1]);
+              let n = bstr.length;
+              const u8arr = new Uint8Array(n);
+              while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+              }
+              const file = new File([u8arr], img.name, { type: mime });
+              return {
+                file,
+                dataUrl: img.dataUrl,
+                name: img.name
+              };
+            })
+          }));
+          
           // Load the posts
-          setPosts(validPosts);
+          setPosts(postsWithFiles);
           
           // If there are posts, switch to the first one
-          if (validPosts.length > 0) {
-            const firstPost = validPosts[0];
+          if (postsWithFiles.length > 0) {
+            const firstPost = postsWithFiles[0];
             setCurrentPostId(firstPost.id);
             setText(firstPost.content);
             setScheduleTime(firstPost.scheduleTime || getCurrentDateTimeString());
             setTimezone(firstPost.timezone || timezone);
+            
+            // Restore images and platform selections for the first post
+            setAttachedImages(firstPost.images || []);
+            setPlatformImageSelections(firstPost.platformImageSelections || {});
+            setHasExplicitSelection({});
           }
           
-          alert(`✅ Successfully loaded ${validPosts.length} posts!`);
+          alert(`✅ Successfully loaded ${postsWithFiles.length} posts!`);
         } catch (error) {
           console.error('Error parsing file:', error);
           alert('❌ Error reading file. Please make sure it\'s a valid JSON file.');
@@ -1599,15 +1676,13 @@ function App() {
         
         // Upload each image to Bluesky
         for (const imageFile of imageFiles) {
-          const imageFormData = new FormData();
-          imageFormData.append('file', imageFile.file);
-          
           const uploadResponse = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${authData.accessToken}`,
+              'Content-Type': imageFile.file.type,
             },
-            body: imageFormData
+            body: imageFile.file
           });
 
           if (uploadResponse.ok) {
@@ -1807,19 +1882,22 @@ function App() {
         setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${selectedPlatform}...`);
         
         let result;
+        // Get platform-specific selected images for first post
+        const platformImages = i === 0 ? getSelectedImagesForPlatform(selectedPlatform) : [];
+        
         switch (selectedPlatform) {
           case 'linkedin':
-            result = await postToLinkedIn(chunk, i === 0 ? attachedImages : []);
+            result = await postToLinkedIn(chunk, platformImages);
             break;
           case 'twitter':
-            result = await postToTwitter(chunk, previousPostId, i === 0 ? attachedImages : []);
+            result = await postToTwitter(chunk, previousPostId, platformImages);
             // Extract tweet ID for next reply
             if (result?.data?.data?.id) {
               previousPostId = result.data.data.id;
             }
             break;
           case 'bluesky':
-            result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, i === 0 ? attachedImages : []);
+            result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, platformImages);
             // Extract URI and CID for next reply
             if (result?.uri && result?.cid) {
               // Set root on first post
@@ -1832,7 +1910,7 @@ function App() {
             }
             break;
           case 'mastodon':
-            result = await postToMastodon(chunk, previousPostId, i === 0 ? attachedImages : []);
+            result = await postToMastodon(chunk, previousPostId, platformImages);
             // Extract status ID for next reply
             if (result?.data?.id) {
               previousPostId = result.data.id;
@@ -1855,9 +1933,11 @@ function App() {
       setPostingStatus('');
       alert(`✅ Successfully posted to ${selectedPlatform}!`);
       
-      // Clear the text and images after successful posting
-      setText('');
-      setAttachedImages([]);
+              // Clear the text and images after successful posting
+        setText('');
+        setAttachedImages([]);
+        setPlatformImageSelections({});
+        setHasExplicitSelection({});
       
     } catch (error) {
       console.error('Posting error:', error);
@@ -1932,19 +2012,22 @@ function App() {
             setPostingStatus(`Posting part ${i + 1} of ${formattedChunks.length} to ${platformNames[platform]}...`);
             
             let result;
+            // Get platform-specific selected images for first post
+            const platformImages = i === 0 ? getSelectedImagesForPlatform(platform) : [];
+            
             switch (platform) {
               case 'linkedin':
-                result = await postToLinkedIn(chunk, i === 0 ? attachedImages : []);
+                result = await postToLinkedIn(chunk, platformImages);
                 break;
               case 'twitter':
-                result = await postToTwitter(chunk, previousPostId, i === 0 ? attachedImages : []);
+                result = await postToTwitter(chunk, previousPostId, platformImages);
                 // Extract tweet ID for next reply
                 if (result?.data?.data?.id) {
                   previousPostId = result.data.data.id;
                 }
                 break;
               case 'bluesky':
-                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, i === 0 ? attachedImages : []);
+                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, platformImages);
                 // Extract URI and CID for next reply
                 if (result?.uri && result?.cid) {
                   // Set root on first post
@@ -1957,7 +2040,7 @@ function App() {
                 }
                 break;
               case 'mastodon':
-                result = await postToMastodon(chunk, previousPostId, i === 0 ? attachedImages : []);
+                result = await postToMastodon(chunk, previousPostId, platformImages);
                 // Extract status ID for next reply
                 if (result?.data?.id) {
                   previousPostId = result.data.id;
@@ -2014,6 +2097,8 @@ function App() {
         // Clear the text and images after successful posting to all platforms
         setText('');
         setAttachedImages([]);
+        setPlatformImageSelections({});
+        setHasExplicitSelection({});
       } else if (successful.length > 0) {
         const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
         const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
@@ -2204,11 +2289,15 @@ function App() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Convert FileList to array for better handling
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
     // Get platform limits
     const platformLimit = IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS];
     
     // Check if adding these files would exceed the platform limit
-    if (attachedImages.length + files.length > platformLimit.maxImages) {
+    if (attachedImages.length + fileArray.length > platformLimit.maxImages) {
       showNotification(`❌ ${selectedPlatform} supports max ${platformLimit.maxImages} images. You currently have ${attachedImages.length} image(s).`);
       return;
     }
@@ -2216,7 +2305,7 @@ function App() {
     const newImages: { file: File; dataUrl: string; name: string; }[] = [];
     let processedCount = 0;
 
-    Array.from(files).forEach((file) => {
+    fileArray.forEach((file) => {
       // Validate file type
       if (!file.type.startsWith('image/')) {
         showNotification(`❌ ${file.name} is not a valid image file`);
@@ -2245,9 +2334,16 @@ function App() {
         processedCount++;
         
         // Once all files are processed, update state
-        if (processedCount === files.length) {
+        if (processedCount === fileArray.length) {
           setAttachedImages(prev => [...prev, ...newImages]);
           const successCount = newImages.length;
+          
+          // Auto-save after uploading images
+          setTimeout(() => {
+            if (currentPostId) {
+              saveCurrentPost();
+            }
+          }, 100);
           if (successCount > 0) {
             showNotification(`✅ ${successCount} image(s) attached successfully`);
           }
@@ -2262,11 +2358,39 @@ function App() {
 
   const removeAttachedImage = (index: number) => {
     setAttachedImages(prev => prev.filter((_, i) => i !== index));
+    
+    // Auto-save after removing image
+    setTimeout(() => {
+      if (currentPostId) {
+        saveCurrentPost();
+      }
+    }, 100);
+    
+    // Update all platform selections to remove the deleted image and adjust indices
+    const updatedSelections = { ...platformImageSelections };
+    Object.keys(updatedSelections).forEach(platform => {
+      const selection = updatedSelections[platform];
+      const newSelection = selection
+        .filter(i => i !== index) // Remove the deleted image
+        .map(i => i > index ? i - 1 : i); // Adjust indices
+      updatedSelections[platform] = newSelection;
+    });
+    setPlatformImageSelections(updatedSelections);
+    
     showNotification('🗑️ Image removed');
   };
 
   const removeAllAttachedImages = () => {
     setAttachedImages([]);
+    setPlatformImageSelections({});
+    setHasExplicitSelection({});
+    
+    // Auto-save after removing all images
+    setTimeout(() => {
+      if (currentPostId) {
+        saveCurrentPost();
+      }
+    }, 100);
     showNotification('🗑️ All images removed');
   };
 
@@ -2291,8 +2415,74 @@ function App() {
       newImages.splice(dragIndex, 1);
       newImages.splice(dropIndex, 0, draggedImage);
       setAttachedImages(newImages);
+      
+      // Auto-save after reordering images
+      setTimeout(() => {
+        if (currentPostId) {
+          saveCurrentPost();
+        }
+      }, 100);
+      
+      // Update all platform selections to reflect the reordering
+      const updatedSelections = { ...platformImageSelections };
+      Object.keys(updatedSelections).forEach(platform => {
+        const selection = updatedSelections[platform];
+        const newSelection = selection.map(index => {
+          if (index === dragIndex) return dropIndex;
+          if (index > dragIndex && index <= dropIndex) return index - 1;
+          if (index < dragIndex && index >= dropIndex) return index + 1;
+          return index;
+        }).sort((a, b) => a - b);
+        updatedSelections[platform] = newSelection;
+      });
+      setPlatformImageSelections(updatedSelections);
+      
       showNotification(`📷 Moved image to position ${dropIndex + 1}`);
     }
+  };
+
+  // Helper functions for platform-specific image management
+  const getSelectedImagesForPlatform = (platform: string) => {
+    const selectedIndices = platformImageSelections[platform] || [];
+    const maxImages = IMAGE_LIMITS[platform as keyof typeof IMAGE_LIMITS].maxImages;
+    
+    // If no specific selection exists and no explicit selection was made, use first N images up to platform limit
+    if (selectedIndices.length === 0 && !hasExplicitSelection[platform]) {
+      const autoSelection = attachedImages.slice(0, Math.min(attachedImages.length, maxImages));
+      
+      // Auto-set the selection but don't mark as explicit
+      if (autoSelection.length > 0) {
+        const autoIndices = autoSelection.map((_, index) => index);
+        updatePlatformSelection(platform, autoIndices, false);
+      }
+      
+      return autoSelection;
+    }
+    
+    // Return selected images (could be empty if user explicitly selected none)
+    return selectedIndices.map(index => attachedImages[index]).filter(Boolean);
+  };
+
+  const updatePlatformSelection = (platform: string, selectedIndices: number[], isExplicit: boolean = true) => {
+    setPlatformImageSelections(prev => ({
+      ...prev,
+      [platform]: selectedIndices
+    }));
+    
+    // Mark as explicit selection if user-initiated
+    if (isExplicit) {
+      setHasExplicitSelection(prev => ({
+        ...prev,
+        [platform]: true
+      }));
+    }
+    
+    // Auto-save after updating platform selection
+    setTimeout(() => {
+      if (currentPostId) {
+        saveCurrentPost();
+      }
+    }, 100);
   };
 
   const handleCopyStyled = async () => {
@@ -2984,6 +3174,11 @@ function App() {
                             📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
                           </p>
                         )}
+                        {post.images && post.images.length > 0 && (
+                          <p className={`text-xs mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                            📷 {post.images.length} image{post.images.length > 1 ? 's' : ''}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 ml-3">
                         {currentPostId === post.id && (
@@ -3160,7 +3355,7 @@ function App() {
             {attachedImages.length > 0 && (
               <div className="flex gap-2">
                 <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-800"}`}>
-                  {attachedImages.length}/{IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages} images
+                  {getSelectedImagesForPlatform(selectedPlatform).length}/{IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages} selected
                 </span>
                 <button
                   onClick={removeAllAttachedImages}
@@ -3181,17 +3376,18 @@ function App() {
               onChange={handleImageUpload}
               className="hidden"
               id="image-upload"
+              disabled={attachedImages.length >= IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages}
             />
             <label
               htmlFor="image-upload"
-              className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+              className={`flex items-center justify-center w-full h-24 border-2 border-dashed rounded-xl transition-colors ${
                 attachedImages.length >= IMAGE_LIMITS[selectedPlatform as keyof typeof IMAGE_LIMITS].maxImages
                   ? darkMode 
                     ? "border-gray-700 bg-gray-800 cursor-not-allowed" 
                     : "border-gray-200 bg-gray-100 cursor-not-allowed"
                   : darkMode 
-                    ? "border-gray-600 hover:border-gray-500 bg-gray-700 hover:bg-gray-600" 
-                    : "border-gray-300 hover:border-gray-400 bg-gray-50 hover:bg-gray-100"
+                    ? "border-gray-600 hover:border-gray-500 bg-gray-700 hover:bg-gray-600 cursor-pointer" 
+                    : "border-gray-300 hover:border-gray-400 bg-gray-50 hover:bg-gray-100 cursor-pointer"
               }`}
             >
               <div className="text-center">
@@ -3209,22 +3405,47 @@ function App() {
           {/* Image previews with enhanced modification controls */}
           {attachedImages.length > 0 && (
             <div className="space-y-3">
-              <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                💡 Images will be attached to the first post. Click images to preview, ✕ to remove, or drag to reorder.
+              <div className="flex items-center justify-between">
+                <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                  💡 Images will be attached to the first post. Click images to preview, ✕ to remove, or drag to reorder.
+                </div>
+                {attachedImages.length > 1 && (
+                  <button
+                    onClick={() => {
+                      setPendingPlatform(selectedPlatform);
+                      setShowImageSelector(true);
+                    }}
+                    className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                  >
+                    🎯 Select Images
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {attachedImages.map((image, index) => (
-                  <div 
-                    key={index} 
-                    draggable={attachedImages.length > 1}
-                    onDragStart={(e) => handleDragStart(e, index)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, index)}
-                    className={`relative group p-3 border rounded-xl transition-all hover:shadow-md ${
-                      attachedImages.length > 1 ? 'cursor-move' : ''
-                    } ${darkMode ? "border-gray-600 bg-gray-700 hover:bg-gray-650" : "border-gray-300 bg-gray-50 hover:bg-gray-100"}`}
-                    title={attachedImages.length > 1 ? "Drag to reorder images" : ""}
-                  >
+                {attachedImages.map((image, index) => {
+                  const selectedImages = getSelectedImagesForPlatform(selectedPlatform);
+                  const isSelected = selectedImages.some(selected => selected.name === image.name && selected.file.size === image.file.size);
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      draggable={attachedImages.length > 1}
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                      className={`relative group p-3 border rounded-xl transition-all hover:shadow-md ${
+                        attachedImages.length > 1 ? 'cursor-move' : ''
+                      } ${
+                        isSelected 
+                          ? darkMode 
+                            ? "border-blue-500 bg-blue-900/20 hover:bg-blue-900/30" 
+                            : "border-blue-500 bg-blue-50 hover:bg-blue-100"
+                          : darkMode 
+                            ? "border-gray-600 bg-gray-700 hover:bg-gray-650" 
+                            : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+                      }`}
+                      title={attachedImages.length > 1 ? "Drag to reorder images" : ""}
+                    >
                     <div className="flex items-start space-x-3">
                       {/* Enhanced image preview with click to expand */}
                       <div className="relative">
@@ -3271,6 +3492,11 @@ function App() {
                             ✅ Will be posted first
                           </div>
                         )}
+                        {isSelected && (
+                          <div className={`text-xs mt-1 font-medium ${darkMode ? "text-green-400" : "text-green-600"}`}>
+                            📌 Selected for {selectedPlatform}
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -3283,7 +3509,8 @@ function App() {
                       ×
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               
               {/* Reorder hint for multiple images */}
@@ -3309,7 +3536,20 @@ function App() {
             ].map((platform) => (
               <button
                 key={platform.key}
-                onClick={() => setSelectedPlatform(platform.key as any)}
+                onClick={() => {
+                  const newPlatform = platform.key as any;
+                  const newLimit = IMAGE_LIMITS[newPlatform].maxImages;
+                  
+                  // Check if current images exceed new platform limit AND user hasn't made explicit selection
+                  if (attachedImages.length > newLimit && !hasExplicitSelection[newPlatform]) {
+                    // Open image selector modal only for first-time selection
+                    setPendingPlatform(newPlatform);
+                    setShowImageSelector(true);
+                  } else {
+                    // Switch directly if under limit OR user has already made selection
+                    setSelectedPlatform(newPlatform);
+                  }
+                }}
                 className={`px-3 py-1 text-sm rounded-lg transition-colors ${
                   selectedPlatform === platform.key
                     ? (darkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white")
@@ -3612,20 +3852,20 @@ function App() {
                       </div>
                       <div className="whitespace-pre-wrap">{chunk}</div>
                       {/* Show attached images only on first chunk */}
-                      {index === 0 && attachedImages.length > 0 && (
+                      {index === 0 && getSelectedImagesForPlatform(selectedPlatform).length > 0 && (
                         <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
                           <div className="flex items-center space-x-2 mb-2">
                             <span className="text-sm text-gray-500 dark:text-gray-400">
-                              📷 Attached Images ({attachedImages.length}):
+                              📷 Selected Images ({getSelectedImagesForPlatform(selectedPlatform).length}):
                             </span>
                           </div>
                           <div className={`grid gap-3 ${
-                            attachedImages.length === 1 ? 'grid-cols-1' :
-                            attachedImages.length === 2 ? 'grid-cols-2' :
-                            attachedImages.length === 3 ? 'grid-cols-3' :
+                            getSelectedImagesForPlatform(selectedPlatform).length === 1 ? 'grid-cols-1' :
+                            getSelectedImagesForPlatform(selectedPlatform).length === 2 ? 'grid-cols-2' :
+                            getSelectedImagesForPlatform(selectedPlatform).length === 3 ? 'grid-cols-3' :
                             'grid-cols-2'
                           }`}>
-                            {attachedImages.map((image, imgIndex) => (
+                            {getSelectedImagesForPlatform(selectedPlatform).map((image, imgIndex) => (
                               <div key={imgIndex} className="relative">
                                 <img
                                   src={image.dataUrl}
@@ -4117,6 +4357,129 @@ function App() {
                 : 'bg-green-100 text-green-800 border-green-300'
           }`}>
             {notification.message}
+          </div>
+        </div>
+      )}
+
+      {/* Image Selection Modal */}
+      {showImageSelector && pendingPlatform && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">
+                  Select Images for {pendingPlatform === 'linkedin' ? 'LinkedIn' : pendingPlatform === 'twitter' ? 'Twitter/X' : pendingPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowImageSelector(false);
+                    setPendingPlatform(null);
+                  }}
+                  className={`text-2xl ${darkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"}`}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <div className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"} mb-3`}>
+                  Select up to {IMAGE_LIMITS[pendingPlatform as keyof typeof IMAGE_LIMITS].maxImages} images to post to {pendingPlatform}:
+                </div>
+                
+                {(() => {
+                  const currentSelection = platformImageSelections[pendingPlatform] || [];
+                  const maxImages = IMAGE_LIMITS[pendingPlatform as keyof typeof IMAGE_LIMITS].maxImages;
+                  
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {attachedImages.map((image, index) => {
+                        const isSelected = currentSelection.includes(index);
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                              isSelected
+                                ? "border-blue-500 shadow-lg scale-[0.98]"
+                                : darkMode 
+                                  ? "border-gray-600 hover:border-gray-500" 
+                                  : "border-gray-300 hover:border-gray-400"
+                            }`}
+                            onClick={() => {
+                              const newSelection = isSelected
+                                ? currentSelection.filter(i => i !== index)
+                                : currentSelection.length < maxImages
+                                  ? [...currentSelection, index].sort((a, b) => a - b)
+                                  : currentSelection;
+                              
+                              updatePlatformSelection(pendingPlatform, newSelection);
+                            }}
+                          >
+                            <img
+                              src={image.dataUrl}
+                              alt={`Image ${index + 1}`}
+                              className="w-full h-32 object-cover"
+                            />
+                            
+                            {/* Selection indicator */}
+                            <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isSelected
+                                ? "bg-blue-500 text-white"
+                                : "bg-black bg-opacity-50 text-white"
+                            }`}>
+                              {isSelected ? '✓' : index + 1}
+                            </div>
+                            
+                            {/* Selection overlay */}
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+                                <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-bold">
+                                  Selected
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                
+                <div className="mt-4 text-center">
+                  <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"} mb-3`}>
+                    {(() => {
+                      const selected = (platformImageSelections[pendingPlatform] || []).length;
+                      const max = IMAGE_LIMITS[pendingPlatform as keyof typeof IMAGE_LIMITS].maxImages;
+                      return `${selected}/${max} images selected`;
+                    })()}
+                  </div>
+                  
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => {
+                        setShowImageSelector(false);
+                        setPendingPlatform(null);
+                      }}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-gray-300 hover:bg-gray-400 text-black"}`}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedPlatform(pendingPlatform as 'linkedin' | 'twitter' | 'mastodon' | 'bluesky');
+                        setShowImageSelector(false);
+                        setPendingPlatform(null);
+                        const selectedCount = (platformImageSelections[pendingPlatform] || []).length;
+                        showNotification(`✅ Switched to ${pendingPlatform} with ${selectedCount} selected images`);
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                    >
+                      Switch Platform
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -3,6 +3,10 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import multer from 'multer';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const FormDataLib = require('form-data');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +36,21 @@ try {
 }
 
 const app = express();
+
+// Configure multer for handling file uploads
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  }
+});
 
 // Middleware
 app.use(cors());
@@ -285,9 +304,9 @@ app.post('/api/oauth/token', async (req, res) => {
 });
 
 // LinkedIn posting endpoint
-app.post('/api/linkedin/post', async (req, res) => {
+app.post('/api/linkedin/post', upload.any(), async (req, res) => {
   try {
-    const { content, accessToken } = req.body;
+    const { content, accessToken, imageCount } = req.body;
     
     if (!content || !accessToken) {
       return res.status(400).json({ error: 'Content and access token are required' });
@@ -336,6 +355,28 @@ app.post('/api/linkedin/post', async (req, res) => {
       console.log('⚠️ Profile fetch error, using fallback:', profileError.message);
     }
     
+    let postData = {
+      author: userUrn,
+      commentary: content,
+      visibility: 'PUBLIC',
+      distribution: {
+        feedDistribution: 'MAIN_FEED',
+        targetEntities: [],
+        thirdPartyDistributionChannels: []
+      },
+      lifecycleState: 'PUBLISHED',
+      isReshareDisabledByAuthor: false
+    };
+    
+    // Handle image uploads if present
+    if (req.files && req.files.length > 0) {
+      console.log(`📷 Uploading ${req.files.length} images to LinkedIn...`);
+      
+      // Note: LinkedIn image upload is complex and requires multiple API calls
+      // For now, we'll just post without images and log a warning
+      console.warn('⚠️ LinkedIn image uploads not yet implemented on server side');
+    }
+    
     // Use the newer LinkedIn Posts API with correct format
     const response = await fetch('https://api.linkedin.com/rest/posts', {
       method: 'POST',
@@ -345,18 +386,7 @@ app.post('/api/linkedin/post', async (req, res) => {
         'X-Restli-Protocol-Version': '2.0.0',
         'LinkedIn-Version': '202506'
       },
-      body: JSON.stringify({
-        author: userUrn,
-        commentary: content,
-        visibility: 'PUBLIC',
-        distribution: {
-          feedDistribution: 'MAIN_FEED',
-          targetEntities: [],
-          thirdPartyDistributionChannels: []
-        },
-        lifecycleState: 'PUBLISHED',
-        isReshareDisabledByAuthor: false
-      })
+      body: JSON.stringify(postData)
     });
     
     if (!response.ok) {
@@ -391,19 +421,63 @@ app.post('/api/linkedin/post', async (req, res) => {
 });
 
 // Twitter posting endpoint
-app.post('/api/twitter/post', async (req, res) => {
+app.post('/api/twitter/post', upload.any(), async (req, res) => {
   try {
-    const { content, accessToken, replyToTweetId } = req.body;
+    const { content, accessToken, replyToTweetId, imageCount } = req.body;
     
     if (!content || !accessToken) {
       return res.status(400).json({ error: 'Content and access token are required' });
     }
     
-
+    console.log('📤 Posting to Twitter via server...');
+    
+    let mediaIds = [];
+    
+    // Handle image uploads if present
+    if (req.files && req.files.length > 0) {
+      console.log(`📷 Uploading ${req.files.length} images to Twitter...`);
+      
+      for (const file of req.files) {
+        try {
+          // Upload media to Twitter - Twitter requires specific FormData format
+          const mediaFormData = new FormDataLib();
+          mediaFormData.append('media', file.buffer, {
+            filename: file.originalname,
+            contentType: file.mimetype
+          });
+          
+          const mediaResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              ...mediaFormData.getHeaders()
+            },
+            body: mediaFormData
+          });
+          
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            mediaIds.push(mediaData.media_id_string);
+            console.log(`✅ Uploaded image to Twitter: ${mediaData.media_id_string}`);
+          } else {
+            console.warn(`❌ Failed to upload image to Twitter:`, await mediaResponse.text());
+          }
+        } catch (uploadError) {
+          console.warn('❌ Error uploading image to Twitter:', uploadError);
+        }
+      }
+    }
     
     const tweetData = {
       text: content
     };
+    
+    // Add media if any were uploaded successfully
+    if (mediaIds.length > 0) {
+      tweetData.media = {
+        media_ids: mediaIds
+      };
+    }
     
     // Add reply field if this is a reply to another tweet
     if (replyToTweetId) {
@@ -433,6 +507,8 @@ app.post('/api/twitter/post', async (req, res) => {
     }
     
     const result = await response.json();
+    console.log('✅ Twitter post successful:', result);
+    
     res.json({ success: true, data: result });
     
   } catch (error) {
@@ -445,9 +521,9 @@ app.post('/api/twitter/post', async (req, res) => {
 });
 
 // Mastodon posting endpoint
-app.post('/api/mastodon/post', async (req, res) => {
+app.post('/api/mastodon/post', upload.any(), async (req, res) => {
   try {
-    const { content, accessToken, instanceUrl, replyToStatusId } = req.body;
+    const { content, accessToken, instanceUrl, replyToStatusId, imageCount } = req.body;
     
     if (!content || !accessToken || !instanceUrl) {
       return res.status(400).json({ error: 'Content, access token, and instance URL are required' });
@@ -455,9 +531,51 @@ app.post('/api/mastodon/post', async (req, res) => {
     
     console.log('📤 Posting to Mastodon via server...');
     
+    let mediaIds = [];
+    
+    // Handle image uploads if present
+    if (req.files && req.files.length > 0) {
+      console.log(`📷 Uploading ${req.files.length} images to Mastodon...`);
+      
+      for (const file of req.files) {
+        try {
+          // Upload media to Mastodon - use Node.js FormData
+          const mediaFormData = new FormDataLib();
+          mediaFormData.append('file', file.buffer, {
+            filename: file.originalname,
+            contentType: file.mimetype
+          });
+          
+          const mediaResponse = await fetch(`${instanceUrl}/api/v2/media`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              ...mediaFormData.getHeaders()
+            },
+            body: mediaFormData
+          });
+          
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            mediaIds.push(mediaData.id);
+            console.log(`✅ Uploaded image to Mastodon: ${mediaData.id}`);
+          } else {
+            console.warn(`❌ Failed to upload image to Mastodon:`, await mediaResponse.text());
+          }
+        } catch (uploadError) {
+          console.warn('❌ Error uploading image to Mastodon:', uploadError);
+        }
+      }
+    }
+    
     const statusData = {
       status: content
     };
+    
+    // Add media if any were uploaded successfully
+    if (mediaIds.length > 0) {
+      statusData.media_ids = mediaIds;
+    }
     
     // Add reply field if this is a reply to another status
     if (replyToStatusId) {

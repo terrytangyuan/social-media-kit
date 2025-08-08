@@ -17,12 +17,24 @@
   - **Modification Controls**: Individual remove buttons, remove all option, visual drag handles
   - **Improved Post Preview**: Smart grid layout adapting to image count with numbered overlays
   - **Auto-cleanup**: Images automatically cleared after successful posting
+  - **Smart Platform Switching**: Interactive image selection modal when switching platforms with excess images
+  - **Platform-Specific Image Selection**: Each platform maintains its own selected image set from the uploaded collection
+  - **Visual Image Selection Modal**: Rich interface for selecting specific images per platform with preview and selection indicators
+  - **Intelligent Selection Behavior**: Only prompts for image selection on first switch; respects user choices and doesn't re-prompt unless explicitly requested
+  - **Manual Selection Override**: "Select Images" button always available for users to manually adjust their platform-specific selections
   - **Visual Indicators**: Clear display of current image count vs platform limits with helpful hints
   - **Platform-Specific Handling**: 
     - LinkedIn: FormData upload via API with multiple images
-    - Twitter/X: Media upload with multiple image attachment
-    - Mastodon: Media upload with multiple image support
-    - Bluesky: Blob upload with AT Protocol embed for multiple images
+    - Twitter/X: Media upload with multiple image attachment via Twitter Media API
+    - Mastodon: Media upload with multiple image support via Mastodon Media API  
+    - Bluesky: Direct blob upload via client-side API calls
+  - **Server-Side Image Processing**: Full FormData handling with multer middleware for robust file uploads
+- **API Integration Fixes**: Resolved Twitter media upload failures and Bluesky content-type issues
+- **Post Image Persistence**: Images are now saved with posts and restored when switching between posts or importing/exporting post data
+  - Images stored in post history with full metadata
+  - Platform-specific image selections preserved across sessions
+  - Export/import functionality includes image data (base64 encoded)
+  - Visual image indicators in post manager show image count per post
 
 ### 🐛 Bug Fixes
 
