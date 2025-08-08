@@ -35,6 +35,8 @@
   - Platform-specific image selections preserved across sessions
   - Export/import functionality includes image data (base64 encoded)
   - Visual image indicators in post manager show image count per post
+  - **Auto-Save Functionality**: Images automatically saved on upload, removal, reordering, and platform selection changes
+  - **Pre-Export Saving**: Current post automatically saved before export to ensure no data loss
 
 ### 🐛 Bug Fixes
 
