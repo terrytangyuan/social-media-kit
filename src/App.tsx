@@ -83,6 +83,53 @@ type TaggingState = {
   personMappings: PersonMapping[];
 };
 
+type PlatformPostResult = {
+  platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky';
+  success: boolean;
+  postId?: string;
+  postUrl?: string;
+  error?: string;
+  publishedAt: string;
+};
+
+type PublishedPost = {
+  id: string;
+  title: string;
+  content: string;
+  originalPostId: string; // Reference to the original post from posts array
+  publishedAt: string;
+  timezone: string;
+  platformResults: PlatformPostResult[];
+  images?: {
+    file: File;
+    dataUrl: string;
+    name: string;
+  }[];
+  platformImageSelections?: {
+    [key: string]: number[];
+  };
+};
+
+type DeletedPost = {
+  id: string;
+  title: string;
+  content: string;
+  originalPostId: string;
+  deletedAt: string;
+  timezone: string;
+  createdAt: string;
+  scheduleTime?: string;
+  images?: {
+    file: File;
+    dataUrl: string;
+    name: string;
+  }[];
+  platformImageSelections?: {
+    [key: string]: number[];
+  };
+  deleteReason?: 'user_deleted' | 'post_published';
+};
+
 function App() {
   const [text, setText] = useState("");
   const [darkMode, setDarkMode] = useState(false);
@@ -203,6 +250,12 @@ function App() {
     }
   });
 
+  // Published and deleted posts storage
+  const [publishedPosts, setPublishedPosts] = useState<PublishedPost[]>([]);
+  const [deletedPosts, setDeletedPosts] = useState<DeletedPost[]>([]);
+  const [showPublishedPosts, setShowPublishedPosts] = useState(false);
+  const [showDeletedPosts, setShowDeletedPosts] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoTimeoutRef = useRef<number>();
 
@@ -271,6 +324,8 @@ function App() {
     const schedule = localStorage.getItem("scheduleTime");
     const savedTimezone = localStorage.getItem("timezone");
     const savedPosts = localStorage.getItem("socialMediaPosts");
+    const savedPublishedPosts = localStorage.getItem("socialMediaPublishedPosts");
+    const savedDeletedPosts = localStorage.getItem("socialMediaDeletedPosts");
     const savedAuth = localStorage.getItem("platformAuth");
     const savedOAuthConfig = localStorage.getItem("oauthConfig");
     const savedTagging = localStorage.getItem("unifiedTagging");
@@ -282,6 +337,26 @@ function App() {
     
     if (savedXPremium) {
       setIsXPremium(JSON.parse(savedXPremium));
+    }
+    
+    // Load published posts
+    if (savedPublishedPosts) {
+      try {
+        const parsedPublishedPosts = JSON.parse(savedPublishedPosts);
+        setPublishedPosts(parsedPublishedPosts);
+      } catch (error) {
+        console.error('Error loading published posts:', error);
+      }
+    }
+    
+    // Load deleted posts
+    if (savedDeletedPosts) {
+      try {
+        const parsedDeletedPosts = JSON.parse(savedDeletedPosts);
+        setDeletedPosts(parsedDeletedPosts);
+      } catch (error) {
+        console.error('Error loading deleted posts:', error);
+      }
     }
     
     if (savedPosts) {
@@ -475,6 +550,14 @@ function App() {
       return () => clearTimeout(timeoutId);
     }
   }, [posts, autoSyncEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem("socialMediaPublishedPosts", JSON.stringify(publishedPosts));
+  }, [publishedPosts]);
+
+  useEffect(() => {
+    localStorage.setItem("socialMediaDeletedPosts", JSON.stringify(deletedPosts));
+  }, [deletedPosts]);
 
   useEffect(() => {
     localStorage.setItem("platformAuth", JSON.stringify(auth));
@@ -925,6 +1008,12 @@ function App() {
   };
 
   const deletePost = (postId: string) => {
+    // Find the post to be deleted and track it
+    const postToDelete = posts.find(p => p.id === postId);
+    if (postToDelete) {
+      addDeletedPost(postToDelete, 'user_deleted');
+    }
+    
     setPosts(prev => prev.filter(p => p.id !== postId));
     if (currentPostId === postId) {
       const remainingPosts = posts.filter(p => p.id !== postId);
@@ -2081,6 +2170,94 @@ function App() {
     return response.json();
   };
 
+  // Published and deleted posts management functions
+  const addPublishedPost = (post: {
+    id: string;
+    title: string;
+    content: string;
+    scheduleTime: string;
+    timezone: string;
+    createdAt: string;
+    images?: any[];
+    platformImageSelections?: { [key: string]: number[] };
+  }, platformResults: PlatformPostResult[]) => {
+    const publishedPost: PublishedPost = {
+      id: `published_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: post.title,
+      content: post.content,
+      originalPostId: post.id,
+      publishedAt: new Date().toISOString(),
+      timezone: post.timezone,
+      platformResults,
+      images: post.images,
+      platformImageSelections: post.platformImageSelections,
+    };
+    
+    setPublishedPosts(prev => [publishedPost, ...prev]);
+  };
+
+  const addDeletedPost = (post: {
+    id: string;
+    title: string;
+    content: string;
+    scheduleTime: string;
+    timezone: string;
+    createdAt: string;
+    images?: any[];
+    platformImageSelections?: { [key: string]: number[] };
+  }, deleteReason: 'user_deleted' | 'post_published' = 'user_deleted') => {
+    const deletedPost: DeletedPost = {
+      id: `deleted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: post.title,
+      content: post.content,
+      originalPostId: post.id,
+      deletedAt: new Date().toISOString(),
+      timezone: post.timezone,
+      createdAt: post.createdAt,
+      scheduleTime: post.scheduleTime,
+      images: post.images,
+      platformImageSelections: post.platformImageSelections,
+      deleteReason,
+    };
+    
+    setDeletedPosts(prev => [deletedPost, ...prev]);
+  };
+
+  const restoreDeletedPost = (deletedPostId: string) => {
+    const deletedPost = deletedPosts.find(p => p.id === deletedPostId);
+    if (!deletedPost) return;
+    
+    // Create a new post from the deleted post
+    const restoredPost = {
+      id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: deletedPost.title,
+      content: deletedPost.content,
+      scheduleTime: deletedPost.scheduleTime || scheduleTime,
+      timezone: deletedPost.timezone,
+      createdAt: new Date().toISOString(),
+      images: deletedPost.images,
+      platformImageSelections: deletedPost.platformImageSelections,
+    };
+    
+    setPosts(prev => [restoredPost, ...prev]);
+    setCurrentPostId(restoredPost.id);
+    setText(restoredPost.content);
+    setScheduleTime(restoredPost.scheduleTime);
+    setTimezone(restoredPost.timezone);
+    
+    // Remove from deleted posts
+    setDeletedPosts(prev => prev.filter(p => p.id !== deletedPostId));
+    
+    // Close the deleted posts modal
+    setShowDeletedPosts(false);
+  };
+
+  const permanentlyDeletePost = (deletedPostId: string) => {
+    if (confirm('Are you sure you want to permanently delete this post? This action cannot be undone.')) {
+      setDeletedPosts(prev => prev.filter(p => p.id !== deletedPostId));
+    }
+  };
+
   const handleAutoPost = async () => {
     const authData = auth[selectedPlatform];
     if (!authData.isAuthenticated) {
@@ -2219,7 +2396,7 @@ function App() {
     
     try {
       setIsPosting(true);
-      const results: Array<{ platform: string; success: boolean; error?: string }> = [];
+      const results: Array<{ platform: string; success: boolean; error?: string; postId?: string; postUrl?: string }> = [];
       
       for (const platform of connectedPlatforms) {
         try {
@@ -2236,6 +2413,8 @@ function App() {
           // Track root post for Bluesky threading
           let rootPostUri: string | undefined;
           let rootPostCid: string | undefined;
+          // Track first result for post information
+          let firstResult: any = null;
           
           for (let i = 0; i < formattedChunks.length; i++) {
             const chunk = formattedChunks[i];
@@ -2278,6 +2457,11 @@ function App() {
                 break;
             }
             
+            // Store first result for tracking
+            if (i === 0) {
+              firstResult = result;
+            }
+            
             // Add delay between posts for multi-part content (increased for Twitter)
             if (i < formattedChunks.length - 1) {
               const delay = platform === 'twitter' ? 5000 : 2000; // 5 seconds for Twitter, 2 for others
@@ -2286,7 +2470,30 @@ function App() {
             }
           }
           
-          results.push({ platform: platformNames[platform], success: true });
+          // Extract post information for tracking
+          let postId = '';
+          let postUrl = '';
+          
+          if (platform === 'twitter' && firstResult?.data?.data?.id) {
+            postId = firstResult.data.data.id;
+            postUrl = `https://twitter.com/i/status/${postId}`;
+          } else if (platform === 'linkedin' && firstResult?.data?.id) {
+            postId = firstResult.data.id;
+            // LinkedIn post URLs are more complex, so we'll just track the ID
+          } else if (platform === 'bluesky' && firstResult?.uri) {
+            postId = firstResult.uri;
+            // Extract handle and rkey for URL construction if needed
+          } else if (platform === 'mastodon' && firstResult?.data?.id) {
+            postId = firstResult.data.id;
+            postUrl = firstResult.data.url || '';
+          }
+          
+          results.push({ 
+            platform: platformNames[platform], 
+            success: true, 
+            postId, 
+            postUrl 
+          });
           
           // Add delay between platforms (longer if Twitter was just used)
           if (connectedPlatforms.indexOf(platform) < connectedPlatforms.length - 1) {
@@ -2324,12 +2531,78 @@ function App() {
       
       if (successful.length === results.length) {
         alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
-        // Clear the text and images after successful posting to all platforms
-        setText('');
+        
+        // Track the published post
+        const currentPost = posts.find(p => p.id === currentPostId);
+        if (currentPost) {
+          const platformResults: PlatformPostResult[] = successful.map(r => ({
+            platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+            success: true,
+            postId: r.postId || '',
+            postUrl: r.postUrl || '',
+            publishedAt: new Date().toISOString(),
+          }));
+          
+          addPublishedPost(currentPost, platformResults);
+          
+          // Optionally move the post to deleted with reason 'post_published'
+          addDeletedPost(currentPost, 'post_published');
+          
+          // Remove the post from the active posts list
+          setPosts(prev => prev.filter(p => p.id !== currentPostId));
+          
+          // Create a new post or switch to another one
+          if (posts.length > 1) {
+            const remainingPosts = posts.filter(p => p.id !== currentPostId);
+            const nextPost = remainingPosts[0];
+            setCurrentPostId(nextPost.id);
+            setText(nextPost.content);
+            setScheduleTime(nextPost.scheduleTime);
+            setTimezone(nextPost.timezone);
+          } else {
+            // Create a new empty post
+            const newPostId = `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const newPost = {
+              id: newPostId,
+              title: "Untitled Post",
+              content: "",
+              scheduleTime: scheduleTime,
+              timezone: timezone,
+              createdAt: new Date().toISOString(),
+            };
+            setPosts([newPost]);
+            setCurrentPostId(newPostId);
+            setText('');
+          }
+        }
+        
+        // Clear images after successful posting
         setAttachedImages([]);
         setPlatformImageSelections({});
         setHasExplicitSelection({});
       } else if (successful.length > 0) {
+        // Track partial success as published post
+        const currentPost = posts.find(p => p.id === currentPostId);
+        if (currentPost) {
+          const platformResults: PlatformPostResult[] = [
+            ...successful.map(r => ({
+              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+              success: true,
+              postId: r.postId || '',
+              postUrl: r.postUrl || '',
+              publishedAt: new Date().toISOString(),
+            })),
+            ...failed.map(r => ({
+              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+              success: false,
+              error: r.error || 'Unknown error',
+              publishedAt: new Date().toISOString(),
+            }))
+          ];
+          
+          addPublishedPost(currentPost, platformResults);
+        }
+        
         const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
         const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
         alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
@@ -3115,6 +3388,7 @@ function App() {
             >
               📝 Posts ({posts.length})
             </button>
+
             <button
               onClick={() => window.open('https://github.com/terrytangyuan/social-media-kit', '_blank')}
               className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "bg-yellow-500 hover:bg-yellow-600 text-white"}`}
@@ -3379,6 +3653,20 @@ function App() {
                 >
                   ➕ New Post
                 </button>
+                <button
+                  onClick={() => setShowPublishedPosts(true)}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"}`}
+                  title="View published posts"
+                >
+                  ✅ Published ({publishedPosts.length})
+                </button>
+                <button
+                  onClick={() => setShowDeletedPosts(true)}
+                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                  title="View deleted posts"
+                >
+                  🗑️ Deleted ({deletedPosts.length})
+                </button>
               </div>
             </div>
             
@@ -3450,6 +3738,151 @@ function App() {
             )}
             
 
+          </div>
+        )}
+
+        {/* Published Posts Modal */}
+        {showPublishedPosts && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="flex justify-between items-center p-6 border-b border-gray-300">
+                <h2 className="text-xl font-semibold">✅ Published Posts ({publishedPosts.length})</h2>
+                <button
+                  onClick={() => setShowPublishedPosts(false)}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"}`}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                {publishedPosts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-4">📭</div>
+                    <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      No published posts yet. Posts will appear here after you publish them to social platforms.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {publishedPosts.map((post) => (
+                      <div key={post.id} className={`p-4 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-lg">{post.title}</h3>
+                          <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-green-600" : "bg-green-100 text-green-800"}`}>
+                            Published {new Date(post.publishedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className={`text-sm mb-3 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                          {post.content.length > 200 ? `${post.content.substring(0, 200)}...` : post.content}
+                        </p>
+                        <div className="mb-3">
+                          <p className={`text-xs font-medium mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            Published to {post.platformResults.length} platform(s):
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {post.platformResults.map((result, index) => (
+                              <div key={index} className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                                result.success 
+                                  ? darkMode ? "bg-green-600 text-white" : "bg-green-100 text-green-800"
+                                  : darkMode ? "bg-red-600 text-white" : "bg-red-100 text-red-800"
+                              }`}>
+                                {result.success ? "✅" : "❌"}
+                                {result.platform}
+                                {result.postUrl && (
+                                  <button
+                                    onClick={() => window.open(result.postUrl, '_blank')}
+                                    className="ml-1 text-blue-500 hover:text-blue-600"
+                                    title="View post"
+                                  >
+                                    🔗
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {post.images && post.images.length > 0 && (
+                          <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            📷 {post.images.length} image(s) attached
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Deleted Posts Modal */}
+        {showDeletedPosts && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="flex justify-between items-center p-6 border-b border-gray-300">
+                <h2 className="text-xl font-semibold">🗑️ Deleted Posts ({deletedPosts.length})</h2>
+                <button
+                  onClick={() => setShowDeletedPosts(false)}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"}`}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                {deletedPosts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-4">🗑️</div>
+                    <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      No deleted posts yet. Posts will appear here when you delete them or after they're published.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {deletedPosts.map((post) => (
+                      <div key={post.id} className={`p-4 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-semibold text-lg">{post.title}</h3>
+                          <div className="flex gap-2">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              post.deleteReason === 'post_published'
+                                ? darkMode ? "bg-green-600" : "bg-green-100 text-green-800"
+                                : darkMode ? "bg-red-600" : "bg-red-100 text-red-800"
+                            }`}>
+                              {post.deleteReason === 'post_published' ? 'Published' : 'Deleted'}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-gray-600" : "bg-gray-200 text-gray-600"}`}>
+                              {new Date(post.deletedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <p className={`text-sm mb-3 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                          {post.content.length > 200 ? `${post.content.substring(0, 200)}...` : post.content}
+                        </p>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => restoreDeletedPost(post.id)}
+                            className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                          >
+                            ↩️ Restore
+                          </button>
+                          <button
+                            onClick={() => permanentlyDeletePost(post.id)}
+                            className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                          >
+                            🗑️ Delete Forever
+                          </button>
+                        </div>
+                        {post.images && post.images.length > 0 && (
+                          <p className={`text-xs mt-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            📷 {post.images.length} image(s) attached
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -3529,38 +3962,40 @@ function App() {
               >
                 🏷️ Tags
               </button>
-              <button
-                onClick={() => {
-                  if (!text.trim()) {
-                    alert('❌ Please write some content before saving');
-                    return;
-                  }
-                  
-                  if (!currentPostId) {
-                    // Create new post if no current post
-                    const currentTime = getCurrentDateTimeString();
-                    const newPost = {
-                      id: Date.now().toString(),
-                      title: `Post ${posts.length + 1}`,
-                      content: text,
-                      scheduleTime: scheduleTime || currentTime,
-                      timezone: timezone,
-                      createdAt: new Date().toISOString()
-                    };
-                    setPosts(prev => [...prev, newPost]);
-                    setCurrentPostId(newPost.id);
-                    alert(`✅ Post saved as "${newPost.title}"`);
-                  } else {
-                    // Update existing post
-                    saveCurrentPost();
-                    const currentPost = posts.find(p => p.id === currentPostId);
-                    alert(`✅ Post "${currentPost?.title || 'Untitled'}" updated`);
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm"
-              >
-                💾 Save Current
-              </button>
+              {!autoSyncEnabled && (
+                <button
+                  onClick={() => {
+                    if (!text.trim()) {
+                      alert('❌ Please write some content before saving');
+                      return;
+                    }
+                    
+                    if (!currentPostId) {
+                      // Create new post if no current post
+                      const currentTime = getCurrentDateTimeString();
+                      const newPost = {
+                        id: Date.now().toString(),
+                        title: `Post ${posts.length + 1}`,
+                        content: text,
+                        scheduleTime: scheduleTime || currentTime,
+                        timezone: timezone,
+                        createdAt: new Date().toISOString()
+                      };
+                      setPosts(prev => [...prev, newPost]);
+                      setCurrentPostId(newPost.id);
+                      showNotification(`✅ Post saved as "${newPost.title}"`);
+                    } else {
+                      // Update existing post
+                      saveCurrentPost();
+                      const currentPost = posts.find(p => p.id === currentPostId);
+                      showNotification(`✅ Post "${currentPost?.title || 'Untitled'}" updated`);
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm"
+                >
+                  💾 Save Current
+                </button>
+              )}
 
             </div>
 
