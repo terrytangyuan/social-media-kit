@@ -156,6 +156,12 @@ function App() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [selectedLogoutPlatforms, setSelectedLogoutPlatforms] = useState<string[]>([]);
   
+  // Auto-sync state
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
+    const saved = localStorage.getItem('autoSyncEnabled');
+    return saved !== null ? JSON.parse(saved) : true; // Default to enabled
+  });
+  
   // OAuth configuration state
   const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
   const [showOAuthSettings, setShowOAuthSettings] = useState(false);
@@ -290,6 +296,9 @@ function App() {
         setScheduleTime(firstPost.scheduleTime);
         setTimezone(firstPost.timezone);
       }
+    } else {
+      // If no saved posts in localStorage, try to load from auto-sync
+      loadAutoSyncedPosts();
     }
     
     if (savedAuth) {
@@ -455,7 +464,17 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("socialMediaPosts", JSON.stringify(posts));
-  }, [posts]);
+    
+    // Auto-sync posts when they change
+    if (posts.length > 0 && autoSyncEnabled) {
+      // Debounce auto-sync to avoid excessive saves
+      const timeoutId = setTimeout(() => {
+        autoSyncPosts();
+      }, 1000);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [posts, autoSyncEnabled]);
 
   useEffect(() => {
     localStorage.setItem("platformAuth", JSON.stringify(auth));
@@ -1039,6 +1058,122 @@ function App() {
     };
     
     fileInput.click();
+  };
+
+  // Auto-sync functions
+  const autoSyncPosts = () => {
+    if (!autoSyncEnabled) return;
+    
+    try {
+      // Auto-save current post before syncing
+      if (currentPostId) {
+        saveCurrentPost();
+      }
+      
+      // Convert posts with File objects to serializable format
+      const serializablePosts = posts.map(post => ({
+        ...post,
+        images: post.images?.map(img => ({
+          dataUrl: img.dataUrl,
+          name: img.name,
+        }))
+      }));
+      
+      const dataToSync = {
+        posts: serializablePosts,
+        lastSyncAt: new Date().toISOString(),
+        appVersion: "0.2.1"
+      };
+      
+      localStorage.setItem('autoSyncData', JSON.stringify(dataToSync));
+      console.log('📁 Auto-synced posts to local storage');
+    } catch (error) {
+      console.error('❌ Auto-sync failed:', error);
+    }
+  };
+
+  const loadAutoSyncedPosts = () => {
+    if (!autoSyncEnabled) return;
+    
+    try {
+      const syncedData = localStorage.getItem('autoSyncData');
+      if (!syncedData) return;
+      
+      const data = JSON.parse(syncedData);
+      
+      // Validate the data structure
+      if (!data.posts || !Array.isArray(data.posts)) {
+        console.warn('⚠️ Invalid auto-sync data format');
+        return;
+      }
+      
+      // Validate each post has required fields
+      const validPosts = data.posts.filter((post: any) => 
+        post.id && post.title !== undefined && post.content !== undefined
+      );
+      
+      if (validPosts.length === 0) {
+        console.warn('⚠️ No valid posts found in auto-sync data');
+        return;
+      }
+      
+      // Convert image data back to File objects
+      const postsWithFiles = validPosts.map((post: any) => ({
+        ...post,
+        images: post.images?.map((img: any) => {
+          // Convert dataUrl back to File object
+          const dataUrl = img.dataUrl;
+          const arr = dataUrl.split(',');
+          const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const file = new File([u8arr], img.name, { type: mime });
+          return {
+            file,
+            dataUrl: img.dataUrl,
+            name: img.name
+          };
+        })
+      }));
+      
+      // Load the posts
+      setPosts(postsWithFiles);
+      
+      // If there are posts, switch to the first one
+      if (postsWithFiles.length > 0) {
+        const firstPost = postsWithFiles[0];
+        setCurrentPostId(firstPost.id);
+        setText(firstPost.content);
+        setScheduleTime(firstPost.scheduleTime || getCurrentDateTimeString());
+        setTimezone(firstPost.timezone || timezone);
+        // Restore images and platform selections
+        setAttachedImages(firstPost.images || []);
+        setPlatformImageSelections(firstPost.platformImageSelections || {});
+        setHasExplicitSelection({}); // Reset explicit selection tracking
+      }
+      
+      console.log(`📁 Auto-loaded ${postsWithFiles.length} posts from local storage`);
+    } catch (error) {
+      console.error('❌ Auto-load failed:', error);
+    }
+  };
+
+  const toggleAutoSync = () => {
+    const newValue = !autoSyncEnabled;
+    setAutoSyncEnabled(newValue);
+    localStorage.setItem('autoSyncEnabled', JSON.stringify(newValue));
+    
+    if (newValue) {
+      // If enabling auto-sync, sync immediately
+      autoSyncPosts();
+      showNotification('✅ Auto-sync enabled and posts synced');
+    } else {
+      showNotification('❌ Auto-sync disabled');
+    }
   };
 
   // OAuth configuration functions
@@ -3209,6 +3344,21 @@ function App() {
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
               <div className="flex gap-2">
+                <button
+                  onClick={toggleAutoSync}
+                  className={`text-sm px-3 py-1 rounded-lg ${
+                    autoSyncEnabled
+                      ? darkMode 
+                        ? "bg-green-600 hover:bg-green-700 text-white" 
+                        : "bg-green-500 hover:bg-green-600 text-white"
+                      : darkMode 
+                        ? "bg-gray-600 hover:bg-gray-500 text-white" 
+                        : "bg-gray-400 hover:bg-gray-500 text-white"
+                  }`}
+                  title={autoSyncEnabled ? "Auto-sync enabled - posts automatically saved" : "Auto-sync disabled - manual save required"}
+                >
+                  {autoSyncEnabled ? "🔄 Auto-Sync ON" : "⏸️ Auto-Sync OFF"}
+                </button>
                 <button
                   onClick={loadPostsFromDisk}
                   className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
