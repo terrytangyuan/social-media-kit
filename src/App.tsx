@@ -152,6 +152,10 @@ function App() {
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [pendingPlatform, setPendingPlatform] = useState<string | null>(null);
   
+  // Multi-platform logout modal state
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [selectedLogoutPlatforms, setSelectedLogoutPlatforms] = useState<string[]>([]);
+  
   // OAuth configuration state
   const [oauthConfig, setOauthConfig] = useState<OAuthConfig>(DEFAULT_OAUTH_CONFIG);
   const [showOAuthSettings, setShowOAuthSettings] = useState(false);
@@ -1176,7 +1180,7 @@ function App() {
         }
       }));
       
-      alert(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : platform === 'twitter' ? 'Twitter' : 'Mastodon'}!`);
+      showNotification(`✅ Successfully authenticated with ${platform === 'linkedin' ? 'LinkedIn' : platform === 'twitter' ? 'X/Twitter' : 'Mastodon'}!`);
       
       // Clean up platform-specific OAuth data
       if (platform === 'twitter') {
@@ -1336,13 +1340,13 @@ function App() {
       
       setShowAuthModal(false);
       setPostingStatus('');
-      alert('✅ Successfully authenticated with Bluesky!');
+      showNotification('✅ Successfully authenticated with Bluesky!');
       
       // Note: Bluesky auth doesn't involve redirects, so draft should be preserved automatically
       console.log('✅ Bluesky authentication completed - draft preserved');
     } catch (error) {
       console.error('Bluesky auth error:', error);
-      alert('❌ Failed to authenticate with Bluesky. Please check your credentials.');
+      showNotification('❌ Failed to authenticate with Bluesky. Please check your credentials.');
       setPostingStatus('');
     } finally {
       setIsPosting(false);
@@ -1369,7 +1373,98 @@ function App() {
     if (platform === 'twitter') {
       localStorage.removeItem('twitter_code_verifier');
     }
-    alert(`✅ Logged out from ${platform}`);
+    
+    const platformName = platform === 'linkedin' ? 'LinkedIn' : 
+                        platform === 'twitter' ? 'X/Twitter' : 
+                        platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+    showNotification(`✅ Logged out from ${platformName}`);
+  };
+
+  // Get list of authenticated platforms
+  const getAuthenticatedPlatforms = () => {
+    return (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(platform => 
+      auth[platform].isAuthenticated
+    );
+  };
+
+  // Handle multi-platform logout
+  const handleMultiPlatformLogout = () => {
+    if (selectedLogoutPlatforms.length === 0) {
+      showNotification('❌ Please select at least one platform to log out from');
+      return;
+    }
+
+    const platformNames = selectedLogoutPlatforms.map(platform => {
+      switch (platform) {
+        case 'linkedin': return 'LinkedIn';
+        case 'twitter': return 'X/Twitter';
+        case 'mastodon': return 'Mastodon';
+        case 'bluesky': return 'Bluesky';
+        default: return platform;
+      }
+    });
+
+    if (confirm(`Are you sure you want to log out from: ${platformNames.join(', ')}?`)) {
+      const successfulLogouts: string[] = [];
+      const failedLogouts: string[] = [];
+
+      selectedLogoutPlatforms.forEach(platform => {
+        try {
+          // Perform logout operations without showing individual alerts
+          setAuth(prev => ({
+            ...prev,
+            [platform]: {
+              ...prev[platform],
+              isAuthenticated: false,
+              accessToken: null,
+              refreshToken: null,
+              expiresAt: null,
+              userInfo: null,
+              ...(platform === 'bluesky' && { handle: '', appPassword: '' }),
+              ...(platform === 'mastodon' && { handle: '', instanceUrl: 'https://mastodon.social' })
+            }
+          }));
+          
+          localStorage.removeItem(`oauth_state_${platform}`);
+          // Clean up Twitter code verifier on logout
+          if (platform === 'twitter') {
+            localStorage.removeItem('twitter_code_verifier');
+          }
+          
+          const platformName = platform === 'linkedin' ? 'LinkedIn' : 
+                              platform === 'twitter' ? 'X/Twitter' : 
+                              platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+          successfulLogouts.push(platformName);
+        } catch (error) {
+          console.error(`Failed to logout from ${platform}:`, error);
+          const platformName = platform === 'linkedin' ? 'LinkedIn' : 
+                              platform === 'twitter' ? 'X/Twitter' : 
+                              platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+          failedLogouts.push(platformName);
+        }
+      });
+      
+      setSelectedLogoutPlatforms([]);
+      setShowLogoutModal(false);
+      
+      // Show consolidated notification
+      if (failedLogouts.length === 0) {
+        showNotification(`✅ Successfully logged out from ${successfulLogouts.join(', ')}`);
+      } else if (successfulLogouts.length === 0) {
+        showNotification(`❌ Failed to log out from ${failedLogouts.join(', ')}`);
+      } else {
+        showNotification(`⚠️ Partial success: ✅ Logged out from ${successfulLogouts.join(', ')} ❌ Failed: ${failedLogouts.join(', ')}`);
+      }
+    }
+  };
+
+  // Toggle platform selection for logout
+  const toggleLogoutPlatform = (platform: string) => {
+    setSelectedLogoutPlatforms(prev => 
+      prev.includes(platform) 
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    );
   };
 
   // Posting functions
@@ -1945,18 +2040,18 @@ function App() {
       // Handle authentication errors by automatically logging out
       if (selectedPlatform === 'twitter' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('twitter');
-        alert(`❌ Twitter authentication expired. You have been logged out. Please login again to continue posting.`);
+        showNotification(`❌ X/Twitter authentication expired. You have been logged out. Please login again to continue posting.`);
       } else if (selectedPlatform === 'linkedin' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('linkedin');
-        alert(`❌ LinkedIn authentication expired. You have been logged out. Please login again to continue posting.`);
+        showNotification(`❌ LinkedIn authentication expired. You have been logged out. Please login again to continue posting.`);
       } else if (selectedPlatform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('bluesky');
-        alert(`❌ Bluesky authentication expired. You have been logged out. Please login again to continue posting.`);
+        showNotification(`❌ Bluesky authentication expired. You have been logged out. Please login again to continue posting.`);
       } else if (selectedPlatform === 'mastodon' && error instanceof Error && error.message.includes('Authentication failed')) {
         logout('mastodon');
-        alert(`❌ Mastodon authentication expired. You have been logged out. Please login again to continue posting.`);
+        showNotification(`❌ Mastodon authentication expired. You have been logged out. Please login again to continue posting.`);
       } else {
-        alert(`❌ Failed to post to ${selectedPlatform}: ${error}`);
+        showNotification(`❌ Failed to post to ${selectedPlatform}: ${error}`);
       }
       setPostingStatus('');
     } finally {
@@ -3591,12 +3686,23 @@ function App() {
             {auth[selectedPlatform].isAuthenticated ? (
               <div className="flex items-center justify-between">
                 <span className="text-green-500">✅ Connected to {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}</span>
-                <button
-                  onClick={() => logout(selectedPlatform)}
-                  className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
-                >
-                  Logout
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => logout(selectedPlatform)}
+                    className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                  >
+                    Logout
+                  </button>
+                  {getAuthenticatedPlatforms().length > 1 && (
+                    <button
+                      onClick={() => setShowLogoutModal(true)}
+                      className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-orange-500 hover:bg-orange-600 text-white"}`}
+                      title="Logout from multiple platforms"
+                    >
+                      🔓
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -4478,6 +4584,136 @@ function App() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Platform Logout Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-md rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Logout from Platforms</h2>
+                <button
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    setSelectedLogoutPlatforms([]);
+                  }}
+                  className={`text-2xl ${darkMode ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"}`}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <div className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"} mb-3`}>
+                  Select platforms to logout from:
+                </div>
+                
+                {getAuthenticatedPlatforms().length > 1 && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => {
+                        const allPlatforms = getAuthenticatedPlatforms();
+                        if (selectedLogoutPlatforms.length === allPlatforms.length) {
+                          // Deselect all if all are selected
+                          setSelectedLogoutPlatforms([]);
+                        } else {
+                          // Select all if not all are selected
+                          setSelectedLogoutPlatforms(allPlatforms);
+                        }
+                      }}
+                      className={`text-sm px-3 py-1 rounded-md border transition-colors ${
+                        selectedLogoutPlatforms.length === getAuthenticatedPlatforms().length
+                          ? darkMode
+                            ? 'bg-red-600 text-white border-red-600 hover:bg-red-700'
+                            : 'bg-red-500 text-white border-red-500 hover:bg-red-600'
+                          : darkMode
+                            ? 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                      }`}
+                    >
+                      {selectedLogoutPlatforms.length === getAuthenticatedPlatforms().length ? '❌ Deselect All' : '✅ Select All'}
+                    </button>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  {getAuthenticatedPlatforms().map(platform => {
+                    const platformName = platform === 'linkedin' ? 'LinkedIn' : 
+                                        platform === 'twitter' ? 'X/Twitter' : 
+                                        platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+                    const isSelected = selectedLogoutPlatforms.includes(platform);
+                    
+                    return (
+                      <div
+                        key={platform}
+                        onClick={() => toggleLogoutPlatform(platform)}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                          isSelected
+                            ? darkMode 
+                              ? 'border-red-500 bg-red-900/20' 
+                              : 'border-red-500 bg-red-50'
+                            : darkMode 
+                              ? 'border-gray-600 bg-gray-700 hover:border-gray-500' 
+                              : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                              isSelected
+                                ? 'border-red-500 bg-red-500'
+                                : darkMode 
+                                  ? 'border-gray-500' 
+                                  : 'border-gray-300'
+                            }`}>
+                              {isSelected && <span className="text-white text-xs">✓</span>}
+                            </div>
+                            <span className="font-medium">{platformName}</span>
+                          </div>
+                          <span className="text-green-500">✅ Connected</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {getAuthenticatedPlatforms().length === 0 && (
+                  <div className={`text-center py-8 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    No authenticated platforms found.
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    setSelectedLogoutPlatforms([]);
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg border ${
+                    darkMode 
+                      ? "border-gray-600 text-gray-300 hover:bg-gray-700" 
+                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMultiPlatformLogout}
+                  disabled={selectedLogoutPlatforms.length === 0}
+                  className={`flex-1 px-4 py-2 rounded-lg text-white ${
+                    selectedLogoutPlatforms.length === 0
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  Logout ({selectedLogoutPlatforms.length})
+                </button>
               </div>
             </div>
           </div>

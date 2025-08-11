@@ -37,6 +37,18 @@
   - Visual image indicators in post manager show image count per post
   - **Auto-Save Functionality**: Images automatically saved on upload, removal, reordering, and platform selection changes
   - **Pre-Export Saving**: Current post automatically saved before export to ensure no data loss
+- **Multi-Platform Logout**: Enhanced logout functionality allowing users to selectively logout from multiple platforms
+  - **Visual Platform Selection**: Interactive modal showing all authenticated platforms with checkboxes
+  - **Batch Logout**: Logout from multiple platforms simultaneously with confirmation
+  - **Smart UI**: Multi-platform logout button (🔓) only appears when logged into 2+ platforms
+  - **Individual Logout**: Existing single-platform logout functionality preserved alongside new multi-platform option
+  - **Consolidated Notifications**: Single notification shows all logout results instead of multiple alerts
+  - **Error Handling**: Shows partial success status when some platforms fail to logout
+  - **Select All Toggle**: Quick select/deselect all platforms button for convenient bulk operations
+- **Unified Authentication Notifications**: Login success and authentication error messages now use the app's notification system
+  - **Non-Blocking Login Success**: Users no longer need to click "OK" after successful authentication
+  - **Consistent User Experience**: All authentication feedback uses the same elegant notification style
+  - **Improved Platform Names**: Updated Twitter references to "X/Twitter" for consistency
 
 ### 🐛 Bug Fixes
 
