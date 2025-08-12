@@ -127,7 +127,7 @@ type DeletedPost = {
   platformImageSelections?: {
     [key: string]: number[];
   };
-  deleteReason?: 'user_deleted' | 'post_published';
+  deleteReason?: 'user_deleted';
 };
 
 function App() {
@@ -255,6 +255,8 @@ function App() {
   const [deletedPosts, setDeletedPosts] = useState<DeletedPost[]>([]);
   const [showPublishedPosts, setShowPublishedPosts] = useState(false);
   const [showDeletedPosts, setShowDeletedPosts] = useState(false);
+  const [selectedPublishedPost, setSelectedPublishedPost] = useState<PublishedPost | null>(null);
+  const [selectedDeletedPost, setSelectedDeletedPost] = useState<DeletedPost | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoTimeoutRef = useRef<number>();
@@ -2205,7 +2207,7 @@ function App() {
     createdAt: string;
     images?: any[];
     platformImageSelections?: { [key: string]: number[] };
-  }, deleteReason: 'user_deleted' | 'post_published' = 'user_deleted') => {
+  }, deleteReason: 'user_deleted' = 'user_deleted') => {
     const deletedPost: DeletedPost = {
       id: `deleted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: post.title,
@@ -2256,6 +2258,15 @@ function App() {
     if (confirm('Are you sure you want to permanently delete this post? This action cannot be undone.')) {
       setDeletedPosts(prev => prev.filter(p => p.id !== deletedPostId));
     }
+  };
+
+  // Helper function to get deleted posts that are not published
+  const getActualDeletedPosts = () => {
+    return deletedPosts.filter(deletedPost => 
+      !publishedPosts.some(publishedPost => 
+        publishedPost.originalPostId === deletedPost.originalPostId
+      )
+    );
   };
 
   const handleAutoPost = async () => {
@@ -2482,7 +2493,13 @@ function App() {
             // LinkedIn post URLs are more complex, so we'll just track the ID
           } else if (platform === 'bluesky' && firstResult?.uri) {
             postId = firstResult.uri;
-            // Extract handle and rkey for URL construction if needed
+            // Extract rkey from URI and construct Bluesky URL
+            const uriParts = firstResult.uri.split('/');
+            const rkey = uriParts[uriParts.length - 1];
+            const blueskyHandle = auth.bluesky.handle;
+            if (blueskyHandle && rkey) {
+              postUrl = `https://bsky.app/profile/${blueskyHandle}/post/${rkey}`;
+            }
           } else if (platform === 'mastodon' && firstResult?.data?.id) {
             postId = firstResult.data.id;
             postUrl = firstResult.data.url || '';
@@ -2544,9 +2561,6 @@ function App() {
           }));
           
           addPublishedPost(currentPost, platformResults);
-          
-          // Optionally move the post to deleted with reason 'post_published'
-          addDeletedPost(currentPost, 'post_published');
           
           // Remove the post from the active posts list
           setPosts(prev => prev.filter(p => p.id !== currentPostId));
@@ -3665,7 +3679,7 @@ function App() {
                   className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
                   title="View deleted posts"
                 >
-                  🗑️ Deleted ({deletedPosts.length})
+                  🗑️ Deleted ({getActualDeletedPosts().length})
                 </button>
               </div>
             </div>
@@ -3801,11 +3815,21 @@ function App() {
                             ))}
                           </div>
                         </div>
-                        {post.images && post.images.length > 0 && (
-                          <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                            📷 {post.images.length} image(s) attached
-                          </p>
-                        )}
+                        <div className="flex justify-between items-center mt-3">
+                          <div>
+                            {post.images && post.images.length > 0 && (
+                              <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                📷 {post.images.length} image(s) attached
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => setSelectedPublishedPost(post)}
+                            className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                          >
+                            👁️ View Details
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3820,7 +3844,7 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className={`max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
               <div className="flex justify-between items-center p-6 border-b border-gray-300">
-                <h2 className="text-xl font-semibold">🗑️ Deleted Posts ({deletedPosts.length})</h2>
+                <h2 className="text-xl font-semibold">🗑️ Deleted Posts ({getActualDeletedPosts().length})</h2>
                 <button
                   onClick={() => setShowDeletedPosts(false)}
                   className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"}`}
@@ -3829,26 +3853,22 @@ function App() {
                 </button>
               </div>
               <div className="p-6 overflow-y-auto max-h-[70vh]">
-                {deletedPosts.length === 0 ? (
+                {getActualDeletedPosts().length === 0 ? (
                   <div className="text-center py-8">
                     <div className="text-4xl mb-4">🗑️</div>
                     <p className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      No deleted posts yet. Posts will appear here when you delete them or after they're published.
+                      No deleted posts yet. Posts will appear here when you manually delete them.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {deletedPosts.map((post) => (
+                    {getActualDeletedPosts().map((post) => (
                       <div key={post.id} className={`p-4 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="font-semibold text-lg">{post.title}</h3>
                           <div className="flex gap-2">
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              post.deleteReason === 'post_published'
-                                ? darkMode ? "bg-green-600" : "bg-green-100 text-green-800"
-                                : darkMode ? "bg-red-600" : "bg-red-100 text-red-800"
-                            }`}>
-                              {post.deleteReason === 'post_published' ? 'Published' : 'Deleted'}
+                            <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600" : "bg-red-100 text-red-800"}`}>
+                              Deleted
                             </span>
                             <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-gray-600" : "bg-gray-200 text-gray-600"}`}>
                               {new Date(post.deletedAt).toLocaleDateString()}
@@ -3858,29 +3878,269 @@ function App() {
                         <p className={`text-sm mb-3 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
                           {post.content.length > 200 ? `${post.content.substring(0, 200)}...` : post.content}
                         </p>
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => restoreDeletedPost(post.id)}
-                            className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
-                          >
-                            ↩️ Restore
-                          </button>
-                          <button
-                            onClick={() => permanentlyDeletePost(post.id)}
-                            className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
-                          >
-                            🗑️ Delete Forever
-                          </button>
+                        <div className="flex justify-between items-center mt-3">
+                          <div>
+                            {post.images && post.images.length > 0 && (
+                              <p className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                📷 {post.images.length} image(s) attached
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSelectedDeletedPost(post)}
+                              className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-gray-600 hover:bg-gray-700 text-white" : "bg-gray-500 hover:bg-gray-600 text-white"}`}
+                            >
+                              👁️ View Details
+                            </button>
+                            <button
+                              onClick={() => restoreDeletedPost(post.id)}
+                              className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                            >
+                              ↩️ Restore
+                            </button>
+                            <button
+                              onClick={() => permanentlyDeletePost(post.id)}
+                              className={`text-xs px-3 py-1 rounded ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                            >
+                              🗑️ Delete Forever
+                            </button>
+                          </div>
                         </div>
-                        {post.images && post.images.length > 0 && (
-                          <p className={`text-xs mt-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                            📷 {post.images.length} image(s) attached
-                          </p>
-                        )}
                       </div>
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Published Post Details Modal */}
+        {selectedPublishedPost && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="flex justify-between items-center p-6 border-b border-gray-300">
+                <h2 className="text-xl font-semibold">📄 Published Post Details</h2>
+                <button
+                  onClick={() => setSelectedPublishedPost(null)}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"}`}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <div className="space-y-6">
+                  {/* Post Information */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">{selectedPublishedPost.title}</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Published At</p>
+                        <p className="text-sm">{new Date(selectedPublishedPost.publishedAt).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Timezone</p>
+                        <p className="text-sm">{selectedPublishedPost.timezone}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div>
+                    <h4 className={`font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Content</h4>
+                    <div className={`p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+                      <p className="whitespace-pre-wrap text-sm">{selectedPublishedPost.content}</p>
+                    </div>
+                  </div>
+
+                  {/* Platform Results */}
+                  <div>
+                    <h4 className={`font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Platform Results</h4>
+                    <div className="space-y-3">
+                      {selectedPublishedPost.platformResults.map((result, index) => (
+                        <div key={index} className={`p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-lg ${result.success ? "text-green-500" : "text-red-500"}`}>
+                                {result.success ? "✅" : "❌"}
+                              </span>
+                              <span className="font-medium">{result.platform}</span>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              result.success 
+                                ? darkMode ? "bg-green-600 text-white" : "bg-green-100 text-green-800"
+                                : darkMode ? "bg-red-600 text-white" : "bg-red-100 text-red-800"
+                            }`}>
+                              {result.success ? "Success" : "Failed"}
+                            </span>
+                          </div>
+                          <div className="text-sm space-y-1">
+                            <p><span className={`font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Published:</span> {new Date(result.publishedAt).toLocaleString()}</p>
+                            {result.postId && (
+                              <p><span className={`font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Post ID:</span> {result.postId}</p>
+                            )}
+                            {result.postUrl && (
+                              <p>
+                                <span className={`font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>URL:</span> 
+                                <button
+                                  onClick={() => window.open(result.postUrl, '_blank')}
+                                  className="ml-2 text-blue-500 hover:text-blue-600 underline"
+                                >
+                                  {result.postUrl} 🔗
+                                </button>
+                              </p>
+                            )}
+                            {result.error && (
+                              <p><span className={`font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Error:</span> <span className="text-red-500">{result.error}</span></p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Images */}
+                  {selectedPublishedPost.images && selectedPublishedPost.images.length > 0 && (
+                    <div>
+                      <h4 className={`font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Attached Images ({selectedPublishedPost.images.length})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {selectedPublishedPost.images.map((image, index) => (
+                          <div key={index} className={`border rounded-lg overflow-hidden ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                            <img src={image.dataUrl} alt={image.name} className="w-full h-32 object-cover" />
+                            <p className={`p-2 text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{image.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Platform Image Selections */}
+                  {selectedPublishedPost.platformImageSelections && Object.keys(selectedPublishedPost.platformImageSelections).length > 0 && (
+                    <div>
+                      <h4 className={`font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Platform-specific Image Selections</h4>
+                      <div className="space-y-2">
+                        {Object.entries(selectedPublishedPost.platformImageSelections).map(([platform, indices]) => (
+                          <div key={platform} className={`p-3 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                            <span className="font-medium capitalize">{platform}:</span> Images {indices.map(i => i + 1).join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Deleted Post Details Modal */}
+        {selectedDeletedPost && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`max-w-4xl w-full max-h-[90vh] overflow-hidden rounded-xl ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+              <div className="flex justify-between items-center p-6 border-b border-gray-300">
+                <h2 className="text-xl font-semibold">📄 Deleted Post Details</h2>
+                <button
+                  onClick={() => setSelectedDeletedPost(null)}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"}`}
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <div className="space-y-6">
+                  {/* Post Information */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">{selectedDeletedPost.title}</h3>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Created At</p>
+                        <p className="text-sm">{new Date(selectedDeletedPost.createdAt).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Deleted At</p>
+                        <p className="text-sm">{new Date(selectedDeletedPost.deletedAt).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Delete Reason</p>
+                        <p className="text-sm">
+                          <span className={`px-2 py-1 rounded text-xs ${darkMode ? "bg-red-600 text-white" : "bg-red-100 text-red-800"}`}>
+                            User Deleted
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Timezone</p>
+                        <p className="text-sm">{selectedDeletedPost.timezone}</p>
+                      </div>
+                    </div>
+                    {selectedDeletedPost.scheduleTime && (
+                      <div className="mb-4">
+                        <p className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Scheduled Time</p>
+                        <p className="text-sm">{new Date(selectedDeletedPost.scheduleTime).toLocaleString()}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div>
+                    <h4 className={`font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Content</h4>
+                    <div className={`p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
+                      <p className="whitespace-pre-wrap text-sm">{selectedDeletedPost.content}</p>
+                    </div>
+                  </div>
+
+                  {/* Images */}
+                  {selectedDeletedPost.images && selectedDeletedPost.images.length > 0 && (
+                    <div>
+                      <h4 className={`font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Attached Images ({selectedDeletedPost.images.length})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {selectedDeletedPost.images.map((image, index) => (
+                          <div key={index} className={`border rounded-lg overflow-hidden ${darkMode ? "border-gray-600" : "border-gray-300"}`}>
+                            <img src={image.dataUrl} alt={image.name} className="w-full h-32 object-cover" />
+                            <p className={`p-2 text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>{image.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Platform Image Selections */}
+                  {selectedDeletedPost.platformImageSelections && Object.keys(selectedDeletedPost.platformImageSelections).length > 0 && (
+                    <div>
+                      <h4 className={`font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Platform-specific Image Selections</h4>
+                      <div className="space-y-2">
+                        {Object.entries(selectedDeletedPost.platformImageSelections).map(([platform, indices]) => (
+                          <div key={platform} className={`p-3 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                            <span className="font-medium capitalize">{platform}:</span> Images {indices.map(i => i + 1).join(', ')}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-300">
+                    <button
+                      onClick={() => {
+                        restoreDeletedPost(selectedDeletedPost.id);
+                        setSelectedDeletedPost(null);
+                      }}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                    >
+                      ↩️ Restore Post
+                    </button>
+                    <button
+                      onClick={() => {
+                        permanentlyDeletePost(selectedDeletedPost.id);
+                        setSelectedDeletedPost(null);
+                      }}
+                      className={`px-4 py-2 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                    >
+                      🗑️ Delete Forever
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
