@@ -74,9 +74,49 @@
         "bluesky": "cncf.io",
         "createdAt": "2025-08-01T01:36:42.798Z",
         "updatedAt": "2025-08-01T01:36:42.798Z"
+      },
+      {
+        "id": "1754926640458",
+        "name": "RHAI",
+        "displayName": "Red Hat AI",
+        "twitter": "RedHat_AI",
+        "mastodon": "",
+        "bluesky": "",
+        "createdAt": "2025-08-11T15:37:20.458Z",
+        "updatedAt": "2025-08-11T15:37:20.458Z"
+      },
+      {
+        "id": "1755135785650",
+        "name": "vLLM",
+        "displayName": "vLLM",
+        "twitter": "vllm_project",
+        "mastodon": "",
+        "bluesky": "",
+        "createdAt": "2025-08-14T01:43:05.650Z",
+        "updatedAt": "2025-08-14T01:43:05.650Z"
+      },
+      {
+        "id": "1755135900377",
+        "name": "LMCache",
+        "displayName": "LMCache",
+        "twitter": "lmcache",
+        "mastodon": "",
+        "bluesky": "",
+        "createdAt": "2025-08-14T01:45:00.377Z",
+        "updatedAt": "2025-08-14T01:45:00.377Z"
+      },
+      {
+        "id": "1755136182001",
+        "name": "KubeCon",
+        "displayName": "KubeCon",
+        "twitter": "KubeCon_",
+        "mastodon": "",
+        "bluesky": "",
+        "createdAt": "2025-08-14T01:49:42.001Z",
+        "updatedAt": "2025-08-14T01:49:42.001Z"
       }
     ]
   },
-  "exportedAt": "2025-08-01T01:36:45.100Z",
+  "exportedAt": "2025-08-14T01:49:43.734Z",
   "appVersion": "0.2.1"
 }
