@@ -2,6 +2,123 @@ import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
+// Tag Autocomplete Component
+type TagSuggestion = {
+  id: string;
+  name: string;
+  displayName: string;
+  twitter?: string;
+  bluesky?: string;
+};
+
+type TagAutocompleteProps = {
+  suggestions: TagSuggestion[];
+  onSelect: (suggestion: TagSuggestion) => void;
+  onClose: () => void;
+  position: { top: number; left: number };
+  darkMode: boolean;
+  filter: string;
+};
+
+const TagAutocomplete = ({ suggestions, onSelect, onClose, position, darkMode, filter }: TagAutocompleteProps) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Filter suggestions based on the current filter
+  const filteredSuggestions = suggestions.filter(suggestion => 
+    suggestion.name.toLowerCase().includes(filter.toLowerCase()) ||
+    suggestion.displayName.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  // Reset selected index when filter changes
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [filter]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (filteredSuggestions.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedIndex(prev => (prev + 1) % filteredSuggestions.length);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedIndex(prev => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (filteredSuggestions[selectedIndex]) {
+            onSelect(filteredSuggestions[selectedIndex]);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [filteredSuggestions, selectedIndex, onSelect, onClose]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (listRef.current) {
+      const selectedElement = listRef.current.children[selectedIndex] as HTMLElement;
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedIndex]);
+
+  if (filteredSuggestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`absolute z-50 max-w-xs w-64 max-h-48 overflow-y-auto rounded-lg border shadow-lg ${
+        darkMode 
+          ? "bg-gray-800 border-gray-600 text-white" 
+          : "bg-white border-gray-300 text-gray-800"
+      }`}
+      style={{
+        top: position.top,
+        left: position.left,
+      }}
+      ref={listRef}
+    >
+      {filteredSuggestions.map((suggestion, index) => (
+        <div
+          key={suggestion.id}
+          className={`px-3 py-2 cursor-pointer border-b last:border-b-0 ${
+            index === selectedIndex
+              ? darkMode 
+                ? "bg-blue-600 text-white" 
+                : "bg-blue-100 text-blue-900"
+              : darkMode
+                ? "hover:bg-gray-700 border-gray-600"
+                : "hover:bg-gray-50 border-gray-200"
+          }`}
+          onClick={() => onSelect(suggestion)}
+        >
+          <div className="font-medium">{suggestion.displayName}</div>
+          <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+            @{suggestion.name}
+            {suggestion.twitter && ` • Twitter: @${suggestion.twitter}`}
+            {suggestion.bluesky && ` • Bluesky: @${suggestion.bluesky}`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // OAuth configuration type
 type OAuthConfig = {
   linkedin: {
@@ -285,6 +402,13 @@ function App() {
     personMappings: []
   });
   const [showTagManager, setShowTagManager] = useState(false);
+  
+  // Tag autocomplete state
+  const [showTagAutocomplete, setShowTagAutocomplete] = useState(false);
+  const [tagAutocompletePosition, setTagAutocompletePosition] = useState({ top: 0, left: 0 });
+  const [tagAutocompleteFilter, setTagAutocompleteFilter] = useState('');
+  const [tagAutocompleteStartPos, setTagAutocompleteStartPos] = useState(0);
+  
   const [newPersonMapping, setNewPersonMapping] = useState<Omit<PersonMapping, 'id' | 'createdAt' | 'updatedAt'>>({
     name: '',
     displayName: '',
@@ -3293,6 +3417,130 @@ function App() {
         saveUndoState();
       }
     }, 500); // Save state after 500ms of no typing
+
+    // Check for tag autocomplete trigger
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Use a small timeout to ensure the cursor position is updated
+      setTimeout(() => {
+        if (textarea.selectionStart !== undefined) {
+          checkForTagAutocomplete(newText, textarea.selectionStart);
+        }
+      }, 0);
+    }
+  };
+
+  // Check if we should show tag autocomplete
+  const checkForTagAutocomplete = (text: string, cursorPos: number) => {
+    // Look backwards from cursor position to find @ symbol
+    let atPos = -1;
+    for (let i = cursorPos - 1; i >= 0; i--) {
+      const char = text[i];
+      if (char === '@') {
+        // Check if this @ is the start of a unified tag @{...}
+        if (i + 1 < text.length && text[i + 1] === '{') {
+          // This is already a unified tag, don't show autocomplete
+          setShowTagAutocomplete(false);
+          return;
+        }
+        atPos = i;
+        break;
+      } else if (char === ' ' || char === '\n' || char === '\t') {
+        // Hit whitespace before finding @, no autocomplete
+        break;
+      }
+    }
+
+    if (atPos !== -1) {
+      // Found @ symbol, extract the filter text
+      const filter = text.substring(atPos + 1, cursorPos);
+      
+      // Only show if we have person mappings and the filter doesn't contain spaces/newlines
+      if (taggingState.personMappings.length > 0 && !/[\s\n\t]/.test(filter)) {
+        setTagAutocompleteFilter(filter);
+        setTagAutocompleteStartPos(atPos);
+        
+        // Calculate position for the dropdown
+        const textarea = textareaRef.current;
+        if (textarea) {
+          const rect = textarea.getBoundingClientRect();
+          
+          // Create a temporary element to measure text dimensions more accurately
+          const measureElement = document.createElement('div');
+          measureElement.style.position = 'absolute';
+          measureElement.style.visibility = 'hidden';
+          measureElement.style.whiteSpace = 'pre';
+          measureElement.style.font = window.getComputedStyle(textarea).font;
+          measureElement.style.padding = '0';
+          measureElement.style.margin = '0';
+          measureElement.style.border = 'none';
+          
+          const textBeforeCursor = text.substring(0, cursorPos);
+          const lines = textBeforeCursor.split('\n');
+          const currentLineText = lines[lines.length - 1];
+          
+          measureElement.textContent = currentLineText;
+          document.body.appendChild(measureElement);
+          
+          const textWidth = measureElement.offsetWidth;
+          const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 24;
+          
+          document.body.removeChild(measureElement);
+          
+          // Calculate position relative to textarea
+          const paddingLeft = parseFloat(window.getComputedStyle(textarea).paddingLeft) || 16;
+          const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop) || 16;
+          
+          const top = rect.top + paddingTop + (lines.length - 1) * lineHeight + lineHeight + window.scrollY;
+          const left = rect.left + paddingLeft + textWidth + window.scrollX;
+          
+          setTagAutocompletePosition({ top, left });
+          setShowTagAutocomplete(true);
+        }
+      } else {
+        setShowTagAutocomplete(false);
+      }
+    } else {
+      setShowTagAutocomplete(false);
+    }
+  };
+
+  // Handle tag selection from autocomplete
+  const handleTagAutocompleteSelect = (suggestion: TagSuggestion) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Save state before making changes
+    saveUndoState();
+
+    // Save scroll position to prevent jumping
+    const scrollTop = textarea.scrollTop;
+    const scrollLeft = textarea.scrollLeft;
+
+    // Replace the partial text with the unified tag
+    const before = text.substring(0, tagAutocompleteStartPos);
+    const after = text.substring(textarea.selectionStart);
+    const tag = `@{${suggestion.name}}`;
+    
+    const newText = before + tag + after;
+    setText(newText);
+    
+    // Hide autocomplete
+    setShowTagAutocomplete(false);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = tagAutocompleteStartPos + tag.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+      // Restore scroll position to prevent jumping
+      textarea.scrollTop = scrollTop;
+      textarea.scrollLeft = scrollLeft;
+    }, 0);
+  };
+
+  // Close tag autocomplete
+  const closeTagAutocomplete = () => {
+    setShowTagAutocomplete(false);
   };
 
   // Undo/Redo functions
@@ -4270,6 +4518,19 @@ function App() {
             placeholder="Write your post here..."
             value={text}
             onChange={(e) => handleTextChange(e.target.value)}
+            onKeyDown={(e) => {
+              // Handle special keys when autocomplete is open
+              if (showTagAutocomplete && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape')) {
+                // Let the TagAutocomplete component handle these keys
+                return;
+              }
+            }}
+            onBlur={() => {
+              // Close autocomplete when textarea loses focus (with a small delay to allow clicking on suggestions)
+              setTimeout(() => {
+                setShowTagAutocomplete(false);
+              }, 150);
+            }}
           />
           {/* Resize handle indicator */}
           <div className={`absolute bottom-1 right-1 w-3 h-3 pointer-events-none opacity-30 ${
@@ -4284,6 +4545,18 @@ function App() {
               <circle cx="10" cy="2" r="0.5" fill="currentColor"/>
             </svg>
           </div>
+          
+          {/* Tag Autocomplete */}
+          {showTagAutocomplete && (
+            <TagAutocomplete
+              suggestions={taggingState.personMappings}
+              onSelect={handleTagAutocompleteSelect}
+              onClose={closeTagAutocomplete}
+              position={tagAutocompletePosition}
+              darkMode={darkMode}
+              filter={tagAutocompleteFilter}
+            />
+          )}
         </div>
 
         {/* Image Upload Section */}

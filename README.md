@@ -214,6 +214,10 @@ The built files will be in the `dist` directory.
   - **X/Twitter**: Username handle (e.g., "TerryTangYuan")
   - **Bluesky**: Handle with domain (e.g., "terrytangyuan.xyz")
 - **Tag in Posts**: Use `@{Person Name}` syntax in your posts
+- **Smart Tag Autocomplete**: Type `@` in the editor to see available tag suggestions
+  - **Fuzzy Search**: Filter suggestions by typing part of a person's name
+  - **Keyboard Navigation**: Use arrow keys to navigate, Enter to select, Escape to close
+  - **Auto-completion**: Automatically replaces `@partial` with `@{Full Name}` format
 - **Platform Conversion**: Automatically converts to platform-specific formats:
   - LinkedIn: `@Yuan Tang` (requires manual @ selection after pasting)
   - Twitter/X: `@TerryTangYuan` (automatic clickable mention)
