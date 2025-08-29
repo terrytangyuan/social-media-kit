@@ -616,6 +616,154 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
   }
 });
 
+// Scheduled posting endpoint for server-side reliability
+app.post('/api/schedule/post', async (req, res) => {
+  try {
+    const { 
+      postId, 
+      content, 
+      platforms, 
+      scheduleTime, 
+      timezone, 
+      images,
+      platformImageSelections,
+      authTokens 
+    } = req.body;
+    
+    if (!postId || !content || !platforms || !scheduleTime || !authTokens) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: postId, content, platforms, scheduleTime, authTokens' 
+      });
+    }
+    
+    console.log(`📅 Scheduling post "${postId}" for ${scheduleTime} to platforms:`, platforms);
+    
+    // Calculate delay until scheduled time
+    const now = new Date();
+    const targetTime = new Date(scheduleTime);
+    const delay = targetTime.getTime() - now.getTime();
+    
+    if (delay <= 0) {
+      return res.status(400).json({ 
+        error: 'Scheduled time must be in the future' 
+      });
+    }
+    
+    // Store the scheduled post (in a real app, you'd use a database)
+    // For now, we'll just set a timeout
+    setTimeout(async () => {
+      try {
+        console.log(`🤖 Executing scheduled post "${postId}"`);
+        
+        const results = [];
+        
+        for (const platform of platforms) {
+          const accessToken = authTokens[platform];
+          if (!accessToken) {
+            console.warn(`❌ No auth token for ${platform}, skipping`);
+            continue;
+          }
+          
+          try {
+            let result;
+            
+            switch (platform) {
+              case 'linkedin':
+                // Use existing LinkedIn posting logic
+                const linkedinResponse = await fetch(`${req.protocol}://${req.get('host')}/api/linkedin/post`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    content,
+                    accessToken,
+                    imageCount: 0 // TODO: Handle images in scheduled posts
+                  })
+                });
+                result = await linkedinResponse.json();
+                break;
+                
+              case 'twitter':
+                const twitterResponse = await fetch(`${req.protocol}://${req.get('host')}/api/twitter/post`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    content,
+                    accessToken,
+                    imageCount: 0
+                  })
+                });
+                result = await twitterResponse.json();
+                break;
+                
+              case 'mastodon':
+                const mastodonResponse = await fetch(`${req.protocol}://${req.get('host')}/api/mastodon/post`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    content,
+                    accessToken: authTokens.mastodon.accessToken,
+                    instanceUrl: authTokens.mastodon.instanceUrl,
+                    imageCount: 0
+                  })
+                });
+                result = await mastodonResponse.json();
+                break;
+                
+              case 'bluesky':
+                // Bluesky posting would need to be implemented server-side
+                console.warn('⚠️ Bluesky server-side posting not yet implemented');
+                continue;
+            }
+            
+            results.push({
+              platform,
+              success: result.success || false,
+              result: result.data || result,
+              error: result.error || null
+            });
+            
+            console.log(`✅ Posted to ${platform} successfully`);
+            
+          } catch (error) {
+            console.error(`❌ Failed to post to ${platform}:`, error);
+            results.push({
+              platform,
+              success: false,
+              error: error.message
+            });
+          }
+        }
+        
+        console.log(`🎉 Scheduled post "${postId}" execution completed:`, results);
+        
+        // In a real app, you might want to notify the client via WebSocket or store results
+        
+      } catch (error) {
+        console.error(`❌ Scheduled post execution failed for "${postId}":`, error);
+      }
+    }, delay);
+    
+    res.json({ 
+      success: true, 
+      message: `Post scheduled successfully for ${targetTime.toISOString()}`,
+      delay: Math.round(delay / 1000) // seconds
+    });
+    
+  } catch (error) {
+    console.error('❌ Schedule post error:', error);
+    res.status(500).json({ 
+      error: 'Failed to schedule post', 
+      details: error.message 
+    });
+  }
+});
+
 // Serve the frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));

@@ -282,6 +282,10 @@ function App() {
     platformImageSelections?: {
       [key: string]: number[];
     };
+    autoPost?: {
+      enabled: boolean;
+      platforms: ('linkedin' | 'twitter' | 'mastodon' | 'bluesky')[];
+    };
   }>>([]);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [showPostManager, setShowPostManager] = useState(false);
@@ -294,6 +298,10 @@ function App() {
   });
   const [isPosting, setIsPosting] = useState(false);
   const [postingStatus, setPostingStatus] = useState<string>('');
+  
+  // Auto-posting state
+  const [autoPostEnabled, setAutoPostEnabled] = useState(false);
+  const [autoPostPlatforms, setAutoPostPlatforms] = useState<('linkedin' | 'twitter' | 'mastodon' | 'bluesky')[]>([]);
   
   // Image upload state - updated to support multiple images with platform-specific selection
   const [attachedImages, setAttachedImages] = useState<{
@@ -1107,7 +1115,11 @@ function App() {
             scheduleTime, 
             timezone,
             images: attachedImages.length > 0 ? attachedImages : undefined,
-            platformImageSelections: Object.keys(platformImageSelections).length > 0 ? platformImageSelections : undefined
+            platformImageSelections: Object.keys(platformImageSelections).length > 0 ? platformImageSelections : undefined,
+            autoPost: autoPostEnabled ? {
+              enabled: autoPostEnabled,
+              platforms: autoPostPlatforms
+            } : undefined
           }
         : post
     ));
@@ -1130,6 +1142,10 @@ function App() {
       setAttachedImages(post.images || []);
       setPlatformImageSelections(post.platformImageSelections || {});
       setHasExplicitSelection({}); // Reset explicit selection tracking
+      
+      // Restore auto-posting settings
+      setAutoPostEnabled(post.autoPost?.enabled || false);
+      setAutoPostPlatforms(post.autoPost?.platforms || []);
     }
   };
 
@@ -1261,6 +1277,10 @@ function App() {
             setAttachedImages(firstPost.images || []);
             setPlatformImageSelections(firstPost.platformImageSelections || {});
             setHasExplicitSelection({});
+            
+            // Restore auto-posting settings
+            setAutoPostEnabled(firstPost.autoPost?.enabled || false);
+            setAutoPostPlatforms(firstPost.autoPost?.platforms || []);
           }
           
           alert(`✅ Successfully loaded ${postsWithFiles.length} posts!`);
@@ -1369,6 +1389,10 @@ function App() {
         setAttachedImages(firstPost.images || []);
         setPlatformImageSelections(firstPost.platformImageSelections || {});
         setHasExplicitSelection({}); // Reset explicit selection tracking
+        
+        // Restore auto-posting settings
+        setAutoPostEnabled(firstPost.autoPost?.enabled || false);
+        setAutoPostPlatforms(firstPost.autoPost?.platforms || []);
       }
       
       console.log(`📁 Auto-loaded ${postsWithFiles.length} posts from local storage`);
@@ -2371,6 +2395,10 @@ function App() {
     setScheduleTime(restoredPost.scheduleTime);
     setTimezone(restoredPost.timezone);
     
+    // Restore auto-posting settings if available
+    setAutoPostEnabled(false); // Reset to default since deleted posts don't have autoPost data
+    setAutoPostPlatforms([]);
+    
     // Remove from deleted posts
     setDeletedPosts(prev => prev.filter(p => p.id !== deletedPostId));
     
@@ -3173,6 +3201,157 @@ function App() {
     }
   };
 
+  // Handle automatic posting for scheduled posts
+  const handleAutoPostForScheduledPost = async (post: typeof posts[0]) => {
+    if (!post.autoPost?.enabled || !post.autoPost.platforms.length) return;
+    
+    const authenticatedPlatforms = post.autoPost.platforms.filter(platform => 
+      auth[platform].isAuthenticated
+    );
+    
+    if (authenticatedPlatforms.length === 0) {
+      const notification = new Notification(`❌ Auto-post failed: ${post.title}`, {
+        body: `No authenticated platforms available. Please log in to: ${post.autoPost.platforms.join(', ')}`,
+        icon: "/favicon.ico",
+        tag: `auto-post-error-${post.id}`,
+        requireInteraction: true
+      });
+      return;
+    }
+    
+    try {
+      // Switch to the post temporarily to get the formatted content
+      const originalPostId = currentPostId;
+      const originalText = text;
+      
+      // Temporarily switch to the scheduled post
+      setCurrentPostId(post.id);
+      setText(post.content);
+      
+      const platformResults: PlatformPostResult[] = [];
+      
+      for (const platform of authenticatedPlatforms) {
+        try {
+          console.log(`🤖 Auto-posting to ${platform}...`);
+          
+          // Get formatted chunks for this platform
+          const formattedText = formatForPlatform(post.content, platform);
+          const chunks = chunkText(formattedText, platform);
+          const formattedChunks = chunks;
+          
+          let previousPostId: string | null = null;
+          let previousPostUri: string | null = null;
+          let previousPostCid: string | null = null;
+          let rootPostUri: string | null = null;
+          let rootPostCid: string | null = null;
+          
+          let firstResult: any = null;
+          
+          for (let i = 0; i < formattedChunks.length; i++) {
+            const chunk = formattedChunks[i];
+            
+            let result;
+            // Get platform-specific selected images for first post only
+            const platformImages = i === 0 ? (post.platformImageSelections?.[platform] || []).map(index => post.images?.[index]).filter(Boolean) || [] : [];
+            
+            switch (platform) {
+              case 'linkedin':
+                result = await postToLinkedIn(chunk, platformImages);
+                break;
+              case 'twitter':
+                result = await postToTwitter(chunk, previousPostId, platformImages);
+                if (result?.data?.data?.id) {
+                  previousPostId = result.data.data.id;
+                }
+                break;
+              case 'bluesky':
+                result = await postToBluesky(chunk, previousPostUri, previousPostCid, rootPostUri, rootPostCid, platformImages);
+                if (result?.uri && result?.cid) {
+                  if (i === 0) {
+                    rootPostUri = result.uri;
+                    rootPostCid = result.cid;
+                  }
+                  previousPostUri = result.uri;
+                  previousPostCid = result.cid;
+                }
+                break;
+              case 'mastodon':
+                result = await postToMastodon(chunk, previousPostId, platformImages);
+                if (result?.data?.id) {
+                  previousPostId = result.data.id;
+                }
+                break;
+            }
+            
+            if (i === 0) {
+              firstResult = result;
+            }
+            
+            // Add delay between posts for multi-part content
+            if (i < formattedChunks.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, platform === 'twitter' ? 2000 : 1000));
+            }
+          }
+          
+          platformResults.push({
+            platform,
+            success: true,
+            postId: firstResult?.data?.id || firstResult?.id || firstResult?.uri,
+            publishedAt: new Date().toISOString()
+          });
+          
+          console.log(`✅ Auto-posted to ${platform} successfully`);
+          
+        } catch (error) {
+          console.error(`❌ Auto-post to ${platform} failed:`, error);
+          platformResults.push({
+            platform,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            publishedAt: new Date().toISOString()
+          });
+        }
+      }
+      
+      // Add to published posts
+      addPublishedPost(post, platformResults);
+      
+      // Restore original post context
+      setCurrentPostId(originalPostId);
+      setText(originalText);
+      
+      // Show success notification
+      const successfulPlatforms = platformResults.filter(r => r.success).map(r => r.platform);
+      const failedPlatforms = platformResults.filter(r => !r.success).map(r => r.platform);
+      
+      let notificationTitle = `🤖 Auto-post completed: ${post.title}`;
+      let notificationBody = '';
+      
+      if (successfulPlatforms.length > 0) {
+        notificationBody += `✅ Posted to: ${successfulPlatforms.join(', ')}`;
+      }
+      if (failedPlatforms.length > 0) {
+        notificationBody += `\n❌ Failed: ${failedPlatforms.join(', ')}`;
+      }
+      
+      const notification = new Notification(notificationTitle, {
+        body: notificationBody,
+        icon: "/favicon.ico",
+        tag: `auto-post-result-${post.id}`,
+        requireInteraction: true
+      });
+      
+    } catch (error) {
+      console.error('❌ Auto-post error:', error);
+      const notification = new Notification(`❌ Auto-post failed: ${post.title}`, {
+        body: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        icon: "/favicon.ico",
+        tag: `auto-post-error-${post.id}`,
+        requireInteraction: true
+      });
+    }
+  };
+
   useEffect(() => {
     // Set up notifications for all scheduled posts
     const timeouts: number[] = [];
@@ -3206,27 +3385,33 @@ function App() {
         
         console.log(`⏰ Reminder set for "${post.title}" at ${formatTimezoneTime(post.scheduleTime, post.timezone)} (in ${Math.round(delay / 1000)} seconds)`);
         
-        const timeout = setTimeout(() => {
+        const timeout = setTimeout(async () => {
           try {
-            // Create notification
-            const notification = new Notification(`⏰ LinkedIn Post Reminder: ${post.title}`, {
-              body: `Time to post "${post.title}" on LinkedIn!\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`,
-              icon: "/favicon.ico",
-              tag: `linkedin-reminder-${post.id}`,
-              requireInteraction: true,
-              silent: false
-            });
+            // Check if auto-posting is enabled for this post
+            if (post.autoPost?.enabled && post.autoPost.platforms.length > 0) {
+              console.log(`🤖 Auto-posting "${post.title}" to platforms:`, post.autoPost.platforms);
+              await handleAutoPostForScheduledPost(post);
+            } else {
+              // Create notification for manual posting
+              const notification = new Notification(`⏰ Post Reminder: ${post.title}`, {
+                body: `Time to post "${post.title}"!\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`,
+                icon: "/favicon.ico",
+                tag: `post-reminder-${post.id}`,
+                requireInteraction: true,
+                silent: false
+              });
 
-            // Also show browser alert as fallback
-            alert(`⏰ REMINDER: Time to post "${post.title}" on LinkedIn!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}\n\nClick on "📝 Posts" to switch to this post.`);
+              // Also show browser alert as fallback
+              alert(`⏰ REMINDER: Time to post "${post.title}"!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}\n\nClick on "📝 Posts" to switch to this post.`);
 
-            // Auto-close notification after 15 seconds
-            setTimeout(() => notification.close(), 15000);
+              // Auto-close notification after 15 seconds
+              setTimeout(() => notification.close(), 15000);
+            }
             
-            console.log(`✅ Notification triggered for "${post.title}"`);
+            console.log(`✅ Scheduled action triggered for "${post.title}"`);
           } catch (error) {
-            console.error("❌ Notification error:", error);
-            alert(`⏰ REMINDER: Time to post "${post.title}" on LinkedIn!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`);
+            console.error("❌ Scheduled action error:", error);
+            alert(`⏰ REMINDER: Time to post "${post.title}"!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`);
           }
         }, delay);
         
@@ -4851,7 +5036,7 @@ function App() {
 
         <div className="mb-4">
           <label className={`block mb-1 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-            Schedule Post Reminder
+            Schedule Post
           </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <input
@@ -4880,6 +5065,82 @@ function App() {
               📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
             </p>
           )}
+          
+          {/* Auto-posting configuration */}
+          <div className="mt-3 p-3 rounded-lg border" style={{
+            backgroundColor: darkMode ? '#374151' : '#f9fafb',
+            borderColor: darkMode ? '#4b5563' : '#e5e7eb'
+          }}>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                id="auto-post-enabled"
+                checked={autoPostEnabled}
+                onChange={(e) => {
+                  setAutoPostEnabled(e.target.checked);
+                  if (!e.target.checked) {
+                    setAutoPostPlatforms([]);
+                  }
+                }}
+                className="rounded"
+              />
+              <label htmlFor="auto-post-enabled" className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                🤖 Auto-post to selected platforms
+              </label>
+            </div>
+            
+            {autoPostEnabled && (
+              <div className="ml-6">
+                <p className={`text-xs mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  Select platforms to automatically post to at the scheduled time:
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).map((platform) => {
+                    const isAuthenticated = auth[platform].isAuthenticated;
+                    const isSelected = autoPostPlatforms.includes(platform);
+                    
+                    return (
+                      <label
+                        key={platform}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                          isAuthenticated 
+                            ? (isSelected 
+                                ? (darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800')
+                                : (darkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-100 hover:bg-gray-200')
+                              )
+                            : (darkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-50 text-gray-400')
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={!isAuthenticated}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAutoPostPlatforms(prev => [...prev, platform]);
+                            } else {
+                              setAutoPostPlatforms(prev => prev.filter(p => p !== platform));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-xs">
+                          {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                          {!isAuthenticated && ' (Login required)'}
+                          {isAuthenticated && ' ✅'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {autoPostPlatforms.length === 0 && (
+                  <p className={`text-xs mt-2 ${darkMode ? "text-yellow-400" : "text-yellow-600"}`}>
+                    ⚠️ Select at least one platform for auto-posting
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           <div className="mt-2 flex items-center gap-2">
             <div className="flex items-center gap-1">
               <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
