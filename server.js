@@ -303,6 +303,118 @@ app.post('/api/oauth/token', async (req, res) => {
   }
 });
 
+// OAuth token refresh endpoint
+app.post('/api/oauth/refresh', async (req, res) => {
+  const { platform, refreshToken } = req.body;
+  
+  try {
+    let tokenUrl;
+    let tokenData;
+    
+    if (platform === 'linkedin') {
+      tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+      
+      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
+      if (!clientSecret) {
+        throw new Error('LinkedIn client secret not configured');
+      }
+      
+      const params = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: process.env.LINKEDIN_CLIENT_ID,
+        client_secret: clientSecret,
+      });
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params
+      });
+      
+      tokenData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`LinkedIn token refresh failed: ${tokenData.error_description || tokenData.error}`);
+      }
+      
+    } else if (platform === 'twitter') {
+      // Twitter OAuth 2.0 with PKCE doesn't use refresh tokens in the same way
+      // Twitter access tokens are long-lived, but we can implement re-authorization if needed
+      throw new Error('Twitter token refresh not supported - tokens are long-lived');
+      
+    } else if (platform === 'mastodon') {
+      // Mastodon supports refresh tokens
+      const instanceUrl = process.env.MASTODON_INSTANCE_URL;
+      if (!instanceUrl) {
+        throw new Error('Mastodon instance URL not configured');
+      }
+      
+      tokenUrl = `${instanceUrl}/oauth/token`;
+      
+      const params = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: process.env.MASTODON_CLIENT_ID,
+        client_secret: process.env.MASTODON_CLIENT_SECRET,
+      });
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params
+      });
+      
+      tokenData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Mastodon token refresh failed: ${tokenData.error_description || tokenData.error}`);
+      }
+      
+    } else if (platform === 'bluesky') {
+      // Bluesky uses session-based authentication with refresh tokens
+      const response = await fetch('https://bsky.social/xrpc/com.atproto.server.refreshSession', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Bluesky token refresh failed: ${errorData.message || 'Unknown error'}`);
+      }
+      
+      const refreshData = await response.json();
+      
+      // Transform Bluesky response to match our expected format
+      tokenData = {
+        access_token: refreshData.accessJwt,
+        refresh_token: refreshData.refreshJwt,
+        expires_in: 24 * 60 * 60, // 24 hours
+      };
+      
+    } else {
+      throw new Error(`Token refresh not supported for platform: ${platform}`);
+    }
+    
+    console.log(`✅ Successfully refreshed ${platform} token`);
+    res.json(tokenData);
+    
+  } catch (error) {
+    console.error(`❌ Token refresh error for ${platform}:`, error);
+    res.status(500).json({ 
+      error: 'Token refresh failed', 
+      details: error.message 
+    });
+  }
+});
+
 // LinkedIn posting endpoint
 app.post('/api/linkedin/post', upload.any(), async (req, res) => {
   try {

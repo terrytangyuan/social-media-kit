@@ -464,6 +464,91 @@ function App() {
     visible: boolean;
   }>({ message: '', visible: false });
 
+  // Helper function to check if token is expired
+  const isTokenExpired = (authData: AuthState): boolean => {
+    if (!authData.isAuthenticated || !authData.accessToken) return true;
+    if (!authData.expiresAt) return false; // No expiration info, assume valid
+    return Date.now() >= authData.expiresAt;
+  };
+
+  // Helper function to attempt automatic token refresh
+  const attemptTokenRefresh = async (platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): Promise<boolean> => {
+    const authData = auth[platform];
+    
+    if (!authData.refreshToken) {
+      console.log(`🔄 No refresh token available for ${platform}, cannot auto-refresh`);
+      return false;
+    }
+
+    try {
+      console.log(`🔄 Attempting to refresh ${platform} token...`);
+      
+      const response = await fetch('/api/oauth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform,
+          refreshToken: authData.refreshToken,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(`❌ Token refresh failed for ${platform}: ${response.status}`);
+        return false;
+      }
+
+      const tokenData = await response.json();
+      
+      // Update auth state with new tokens
+      setAuth(prev => ({
+        ...prev,
+        [platform]: {
+          ...prev[platform],
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || authData.refreshToken, // Keep old refresh token if new one not provided
+          expiresAt: tokenData.expires_in ? Date.now() + (tokenData.expires_in * 1000) : null,
+        }
+      }));
+
+      console.log(`✅ Successfully refreshed ${platform} token`);
+      showNotification(`🔄 ${platform.toUpperCase()} authentication refreshed automatically`);
+      return true;
+      
+    } catch (error) {
+      console.error(`❌ Error refreshing ${platform} token:`, error);
+      return false;
+    }
+  };
+
+  // Helper function to ensure valid authentication before API calls
+  const ensureValidAuth = async (platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): Promise<boolean> => {
+    const authData = auth[platform];
+    
+    // Check if already authenticated and not expired
+    if (authData.isAuthenticated && authData.accessToken && !isTokenExpired(authData)) {
+      return true;
+    }
+    
+    // If expired but we have a refresh token, try to refresh
+    if (isTokenExpired(authData) && authData.refreshToken) {
+      const refreshed = await attemptTokenRefresh(platform);
+      if (refreshed) {
+        return true;
+      }
+    }
+    
+    // Authentication failed or refresh failed
+    console.warn(`❌ Authentication not valid for ${platform}, user needs to re-login`);
+    
+    // Log out the platform since auth is invalid
+    logout(platform);
+    
+    showNotification(`🔒 ${platform.toUpperCase()} authentication expired. Please log in again.`);
+    return false;
+  };
+
   // Helper function to show notifications
   const showNotification = (message: string) => {
     setNotification({ message, visible: true });
@@ -1893,10 +1978,13 @@ function App() {
 
   // Posting functions
   const postToLinkedIn = async (content: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
-    const authData = auth.linkedin;
-    if (!authData.isAuthenticated || !authData.accessToken) {
+    // Ensure valid authentication (with automatic refresh if needed)
+    const isValid = await ensureValidAuth('linkedin');
+    if (!isValid) {
       throw new Error('Not authenticated with LinkedIn');
     }
+    
+    const authData = auth.linkedin;
     
     console.log('📤 Posting to LinkedIn...');
     
@@ -1956,10 +2044,13 @@ function App() {
   };
 
   const postToTwitter = async (content: string, replyToTweetId?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
-    const authData = auth.twitter;
-    if (!authData.isAuthenticated || !authData.accessToken) {
+    // Ensure valid authentication (with automatic refresh if needed)
+    const isValid = await ensureValidAuth('twitter');
+    if (!isValid) {
       throw new Error('Not authenticated with Twitter');
     }
+    
+    const authData = auth.twitter;
     
     let response;
     if (imageFiles.length > 0) {
@@ -2170,10 +2261,13 @@ function App() {
   };
 
   const postToBluesky = async (content: string, replyToUri?: string, replyToCid?: string, rootUri?: string, rootCid?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
-    const authData = auth.bluesky;
-    if (!authData.isAuthenticated || !authData.accessToken) {
+    // Ensure valid authentication (with automatic refresh if needed)
+    const isValid = await ensureValidAuth('bluesky');
+    if (!isValid) {
       throw new Error('Not authenticated with Bluesky');
     }
+    
+    const authData = auth.bluesky;
     
     // Create facets for mentions to make them clickable
     const facets = await createBlueskyFacets(content, authData.accessToken);
@@ -2290,10 +2384,13 @@ function App() {
   };
 
   const postToMastodon = async (content: string, replyToStatusId?: string, imageFiles: { file: File; dataUrl: string; name: string; }[] = []) => {
-    const authData = auth.mastodon;
-    if (!authData.isAuthenticated || !authData.accessToken || !authData.instanceUrl) {
+    // Ensure valid authentication (with automatic refresh if needed)
+    const isValid = await ensureValidAuth('mastodon');
+    if (!isValid) {
       throw new Error('Not authenticated with Mastodon');
     }
+    
+    const authData = auth.mastodon;
     
     let response;
     if (imageFiles.length > 0) {
