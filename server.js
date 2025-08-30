@@ -355,7 +355,7 @@ app.post('/api/linkedin/post', upload.any(), async (req, res) => {
       console.log('⚠️ Profile fetch error, using fallback:', profileError.message);
     }
     
-    let postData = {
+    const postData = {
       author: userUrn,
       commentary: content,
       visibility: 'PUBLIC',
@@ -431,7 +431,7 @@ app.post('/api/twitter/post', upload.any(), async (req, res) => {
     
     console.log('📤 Posting to Twitter via server...');
     
-    let mediaIds = [];
+    const mediaIds = [];
     
     // Handle image uploads if present
     if (req.files && req.files.length > 0) {
@@ -531,7 +531,7 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
     
     console.log('📤 Posting to Mastodon via server...');
     
-    let mediaIds = [];
+    const mediaIds = [];
     
     // Handle image uploads if present
     if (req.files && req.files.length > 0) {
@@ -668,7 +668,7 @@ app.post('/api/schedule/post', async (req, res) => {
             let result;
             
             switch (platform) {
-              case 'linkedin':
+              case 'linkedin': {
                 // Use existing LinkedIn posting logic
                 const linkedinResponse = await fetch(`${req.protocol}://${req.get('host')}/api/linkedin/post`, {
                   method: 'POST',
@@ -683,8 +683,9 @@ app.post('/api/schedule/post', async (req, res) => {
                 });
                 result = await linkedinResponse.json();
                 break;
+              }
                 
-              case 'twitter':
+              case 'twitter': {
                 const twitterResponse = await fetch(`${req.protocol}://${req.get('host')}/api/twitter/post`, {
                   method: 'POST',
                   headers: {
@@ -698,8 +699,9 @@ app.post('/api/schedule/post', async (req, res) => {
                 });
                 result = await twitterResponse.json();
                 break;
+              }
                 
-              case 'mastodon':
+              case 'mastodon': {
                 const mastodonResponse = await fetch(`${req.protocol}://${req.get('host')}/api/mastodon/post`, {
                   method: 'POST',
                   headers: {
@@ -714,6 +716,7 @@ app.post('/api/schedule/post', async (req, res) => {
                 });
                 result = await mastodonResponse.json();
                 break;
+              }
                 
               case 'bluesky':
                 // Bluesky posting would need to be implemented server-side

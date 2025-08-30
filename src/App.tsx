@@ -3441,7 +3441,7 @@ function App() {
         setText(originalText);
       }
       
-      let notificationTitle = `🤖 Auto-post completed: ${post.title}`;
+      const notificationTitle = `🤖 Auto-post completed: ${post.title}`;
       let notificationBody = '';
       
       if (successfulPlatforms.length > 0) {
