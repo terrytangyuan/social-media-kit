@@ -2551,13 +2551,46 @@ function App() {
       }
       
       setPostingStatus('');
-      alert(`✅ Successfully posted to ${selectedPlatform}!`);
       
-              // Clear the text and images after successful posting
+      // Add to published posts
+      const currentPost = posts.find(p => p.id === currentPostId);
+      if (currentPost) {
+        const platformResult: PlatformPostResult = {
+          platform: selectedPlatform,
+          success: true,
+          postId: results[0]?.data?.id || results[0]?.data?.data?.id || results[0]?.id || 'unknown',
+          publishedAt: new Date().toISOString(),
+          postUrl: results[0]?.data?.url || results[0]?.data?.data?.url || results[0]?.url || undefined
+        };
+        
+
+        addPublishedPost(currentPost, [platformResult]);
+        
+        // Remove from drafts and handle switching if this was the active post
+        setPosts(prev => prev.filter(p => p.id !== currentPostId));
+        if (currentPostId === currentPost.id) {
+          const remainingPosts = posts.filter(p => p.id !== currentPostId);
+          if (remainingPosts.length > 0) {
+            switchToPost(remainingPosts[0].id);
+          } else {
+            setCurrentPostId('');
+            setText('');
+            setAttachedImages([]);
+            setPlatformImageSelections({});
+            setHasExplicitSelection({});
+          }
+        }
+      }
+      
+      alert(`✅ Successfully posted to ${selectedPlatform}! Post moved to Published section.`);
+      
+      // Clear the text and images after successful posting (only if no current post)
+      if (!currentPost) {
         setText('');
         setAttachedImages([]);
         setPlatformImageSelections({});
         setHasExplicitSelection({});
+      }
       
     } catch (error) {
       console.error('Posting error:', error);
@@ -2748,20 +2781,29 @@ function App() {
       const successful = results.filter(r => r.success);
       const failed = results.filter(r => !r.success);
       
-      if (successful.length === results.length) {
-        alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
-        
-        // Track the published post
+
+      
+      if (successful.length > 0) {
+        // Track the published post for any successful platforms
         const currentPost = posts.find(p => p.id === currentPostId);
         if (currentPost) {
-          const platformResults: PlatformPostResult[] = successful.map(r => ({
-            platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
-            success: true,
-            postId: r.postId || '',
-            postUrl: r.postUrl || '',
-            publishedAt: new Date().toISOString(),
-          }));
+          const platformResults: PlatformPostResult[] = [
+            ...successful.map(r => ({
+              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+              success: true,
+              postId: r.postId || '',
+              postUrl: r.postUrl || '',
+              publishedAt: new Date().toISOString(),
+            })),
+            ...failed.map(r => ({
+              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+              success: false,
+              error: r.error || 'Unknown error',
+              publishedAt: new Date().toISOString(),
+            }))
+          ];
           
+  
           addPublishedPost(currentPost, platformResults);
           
           // Remove the post from the active posts list
@@ -2796,32 +2838,15 @@ function App() {
         setAttachedImages([]);
         setPlatformImageSelections({});
         setHasExplicitSelection({});
-      } else if (successful.length > 0) {
-        // Track partial success as published post
-        const currentPost = posts.find(p => p.id === currentPostId);
-        if (currentPost) {
-          const platformResults: PlatformPostResult[] = [
-            ...successful.map(r => ({
-              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
-              success: true,
-              postId: r.postId || '',
-              postUrl: r.postUrl || '',
-              publishedAt: new Date().toISOString(),
-            })),
-            ...failed.map(r => ({
-              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
-              success: false,
-              error: r.error || 'Unknown error',
-              publishedAt: new Date().toISOString(),
-            }))
-          ];
-          
-          addPublishedPost(currentPost, platformResults);
-        }
         
-        const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
-        const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
-        alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
+        // Show appropriate success message
+        if (successful.length === results.length) {
+          alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
+        } else {
+          const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
+          const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
+          alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
+        }
       } else {
         const failMsg = failed.map(r => `${r.platform}: ${r.error}`).join('\n');
         alert(`❌ Failed to post to all platforms:\n\n${failMsg}`);
@@ -3399,6 +3424,7 @@ function App() {
       }
       
       // Add to published posts
+      
       addPublishedPost(post, platformResults);
       
       // Update status based on results
