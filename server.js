@@ -439,18 +439,18 @@ app.post('/api/twitter/post', upload.any(), async (req, res) => {
       
       for (const file of req.files) {
         try {
-          // Upload media to Twitter - Twitter requires specific FormData format
-          const mediaFormData = new FormDataLib();
-          mediaFormData.append('media', file.buffer, {
-            filename: file.originalname,
-            contentType: file.mimetype
-          });
+          // Upload media to Twitter - use built-in FormData with Blob
+          const mediaFormData = new FormData();
+          
+          // Create a Blob from the buffer
+          const fileBlob = new Blob([file.buffer], { type: file.mimetype });
+          mediaFormData.append('media', fileBlob, file.originalname);
           
           const mediaResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              ...mediaFormData.getHeaders()
+              'Authorization': `Bearer ${accessToken}`
+              // Let fetch automatically set Content-Type for FormData
             },
             body: mediaFormData
           });
@@ -460,7 +460,8 @@ app.post('/api/twitter/post', upload.any(), async (req, res) => {
             mediaIds.push(mediaData.media_id_string);
             console.log(`✅ Uploaded image to Twitter: ${mediaData.media_id_string}`);
           } else {
-            console.warn(`❌ Failed to upload image to Twitter:`, await mediaResponse.text());
+            const errorText = await mediaResponse.text();
+            console.warn(`❌ Failed to upload image to Twitter (${mediaResponse.status} ${mediaResponse.statusText}):`, errorText);
           }
         } catch (uploadError) {
           console.warn('❌ Error uploading image to Twitter:', uploadError);
