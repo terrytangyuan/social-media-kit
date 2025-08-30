@@ -303,6 +303,15 @@ function App() {
   const [autoPostEnabled, setAutoPostEnabled] = useState(false);
   const [autoPostPlatforms, setAutoPostPlatforms] = useState<('linkedin' | 'twitter' | 'mastodon' | 'bluesky')[]>([]);
   
+  // Scheduled posts tracking
+  const [scheduledPostsStatus, setScheduledPostsStatus] = useState<{[postId: string]: 'pending' | 'executing' | 'completed' | 'failed'}>({});
+  
+  // Track executed posts to prevent re-execution
+  const [executedPosts, setExecutedPosts] = useState<Set<string>>(new Set());
+  
+  // Rate limiting for API calls
+  const [lastApiCall, setLastApiCall] = useState<{[platform: string]: number}>({});
+  
   // Image upload state - updated to support multiple images with platform-specific selection
   const [attachedImages, setAttachedImages] = useState<{
     file: File;
@@ -326,6 +335,17 @@ function App() {
   
   // Multi-platform logout modal state
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  // Schedule post modal state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [modalScheduleTime, setModalScheduleTime] = useState('');
+  const [modalTimezone, setModalTimezone] = useState(() => {
+    const saved = localStorage.getItem("timezone");
+    return saved || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  });
+  const [modalAutoPostEnabled, setModalAutoPostEnabled] = useState(false);
+  const [modalAutoPostPlatforms, setModalAutoPostPlatforms] = useState<('linkedin' | 'twitter' | 'mastodon' | 'bluesky')[]>([]);
+  const [modalNotificationEnabled, setModalNotificationEnabled] = useState(true);
   const [selectedLogoutPlatforms, setSelectedLogoutPlatforms] = useState<string[]>([]);
   
   // Auto-sync state
@@ -695,6 +715,33 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("platformAuth", JSON.stringify(auth));
+    
+    // Remove unauthenticated platforms from auto-posting selection
+    const authenticatedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
+      platform => auth[platform].isAuthenticated
+    );
+    
+    setAutoPostPlatforms(prev => {
+      const removedPlatforms = prev.filter(platform => !authenticatedPlatforms.includes(platform));
+      const validPlatforms = prev.filter(platform => authenticatedPlatforms.includes(platform));
+      
+      // Notify user if platforms were removed
+      if (removedPlatforms.length > 0) {
+        console.warn(`🔓 Removed unauthenticated platforms from auto-posting: ${removedPlatforms.join(', ')}`);
+        
+        // Show notification if user has notification permission
+        if (Notification.permission === "granted") {
+          new Notification(`🔓 Authentication Lost`, {
+            body: `Removed ${removedPlatforms.join(', ')} from auto-posting due to expired authentication. Please log in again.`,
+            icon: "/favicon.ico",
+            tag: `auth-expired`,
+            requireInteraction: false
+          });
+        }
+      }
+      
+      return validPlatforms;
+    });
   }, [auth]);
 
   useEffect(() => {
@@ -1107,6 +1154,9 @@ function App() {
       return;
     }
     
+    // Filter out unauthenticated platforms before saving
+    const validAutoPostPlatforms = autoPostPlatforms.filter(platform => auth[platform].isAuthenticated);
+    
     setPosts(prev => prev.map(post => 
       post.id === currentPostId 
         ? { 
@@ -1116,9 +1166,9 @@ function App() {
             timezone,
             images: attachedImages.length > 0 ? attachedImages : undefined,
             platformImageSelections: Object.keys(platformImageSelections).length > 0 ? platformImageSelections : undefined,
-            autoPost: autoPostEnabled ? {
+            autoPost: autoPostEnabled && validAutoPostPlatforms.length > 0 ? {
               enabled: autoPostEnabled,
-              platforms: autoPostPlatforms
+              platforms: validAutoPostPlatforms
             } : undefined
           }
         : post
@@ -3205,17 +3255,32 @@ function App() {
   const handleAutoPostForScheduledPost = async (post: typeof posts[0]) => {
     if (!post.autoPost?.enabled || !post.autoPost.platforms.length) return;
     
-    const authenticatedPlatforms = post.autoPost.platforms.filter(platform => 
-      auth[platform].isAuthenticated
-    );
+    // Update status to executing
+    setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'executing' }));
+    console.log(`🤖 Starting auto-post execution for "${post.title}"`);
+    
+    // Double-check authentication status at execution time
+    const authenticatedPlatforms = post.autoPost.platforms.filter(platform => {
+      const isAuth = auth[platform].isAuthenticated;
+      if (!isAuth) {
+        console.warn(`⚠️ Platform ${platform} is no longer authenticated, skipping`);
+      }
+      return isAuth;
+    });
     
     if (authenticatedPlatforms.length === 0) {
+      setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'failed' }));
+      
+      // Update the post to remove unauthenticated platforms
+      const unauthenticatedPlatforms = post.autoPost.platforms.filter(platform => !auth[platform].isAuthenticated);
+      
       const notification = new Notification(`❌ Auto-post failed: ${post.title}`, {
-        body: `No authenticated platforms available. Please log in to: ${post.autoPost.platforms.join(', ')}`,
+        body: `Authentication expired for: ${unauthenticatedPlatforms.join(', ')}. Please log in again.`,
         icon: "/favicon.ico",
         tag: `auto-post-error-${post.id}`,
         requireInteraction: true
       });
+      console.error(`❌ Auto-post failed for "${post.title}": Authentication expired for platforms:`, unauthenticatedPlatforms);
       return;
     }
     
@@ -3232,6 +3297,18 @@ function App() {
       
       for (const platform of authenticatedPlatforms) {
         try {
+          // Rate limiting check - prevent rapid successive calls
+          const now = Date.now();
+          const lastCall = lastApiCall[platform] || 0;
+          const minInterval = platform === 'twitter' ? 10000 : 5000; // 10s for Twitter, 5s for others
+          
+          if (now - lastCall < minInterval) {
+            const waitTime = minInterval - (now - lastCall);
+            console.log(`⏳ Rate limiting: waiting ${waitTime}ms before posting to ${platform}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
+          
+          setLastApiCall(prev => ({ ...prev, [platform]: Date.now() }));
           console.log(`🤖 Auto-posting to ${platform}...`);
           
           // Get formatted chunks for this platform
@@ -3304,10 +3381,18 @@ function App() {
           
         } catch (error) {
           console.error(`❌ Auto-post to ${platform} failed:`, error);
+          
+          // Handle authentication errors by automatically logging out
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('Authentication failed')) {
+            console.warn(`🔓 Authentication failed for ${platform}, logging out automatically`);
+            logout(platform);
+          }
+          
           platformResults.push({
             platform,
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: errorMessage,
             publishedAt: new Date().toISOString()
           });
         }
@@ -3316,19 +3401,51 @@ function App() {
       // Add to published posts
       addPublishedPost(post, platformResults);
       
-      // Restore original post context
-      setCurrentPostId(originalPostId);
-      setText(originalText);
-      
-      // Show success notification
+      // Update status based on results
       const successfulPlatforms = platformResults.filter(r => r.success).map(r => r.platform);
       const failedPlatforms = platformResults.filter(r => !r.success).map(r => r.platform);
+      
+      if (successfulPlatforms.length > 0) {
+        setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'completed' }));
+        console.log(`✅ Auto-post completed for "${post.title}": ${successfulPlatforms.join(', ')}`);
+        
+        // Remove the post from the main posts array since it's now published
+        setPosts(prev => prev.filter(p => p.id !== post.id));
+        
+        // If this was the current post, switch to another post or create a new one
+        if (currentPostId === post.id) {
+          const remainingPosts = posts.filter(p => p.id !== post.id);
+          if (remainingPosts.length > 0) {
+            const nextPost = remainingPosts[0];
+            setCurrentPostId(nextPost.id);
+            setText(nextPost.content);
+            setScheduleTime(nextPost.scheduleTime);
+            setTimezone(nextPost.timezone);
+            setAttachedImages(nextPost.images || []);
+            setPlatformImageSelections(nextPost.platformImageSelections || {});
+            setAutoPostEnabled(nextPost.autoPost?.enabled || false);
+            setAutoPostPlatforms(nextPost.autoPost?.platforms || []);
+          } else {
+            // Create a new empty post
+            createNewPost();
+          }
+        }
+      } else {
+        setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'failed' }));
+        console.error(`❌ Auto-post failed for "${post.title}": All platforms failed`);
+      }
+      
+      // Restore original post context only if we didn't switch posts
+      if (currentPostId !== post.id) {
+        setCurrentPostId(originalPostId);
+        setText(originalText);
+      }
       
       let notificationTitle = `🤖 Auto-post completed: ${post.title}`;
       let notificationBody = '';
       
       if (successfulPlatforms.length > 0) {
-        notificationBody += `✅ Posted to: ${successfulPlatforms.join(', ')}`;
+        notificationBody += `✅ Posted to: ${successfulPlatforms.join(', ')}\n📝 Moved to Published Posts`;
       }
       if (failedPlatforms.length > 0) {
         notificationBody += `\n❌ Failed: ${failedPlatforms.join(', ')}`;
@@ -3343,6 +3460,7 @@ function App() {
       
     } catch (error) {
       console.error('❌ Auto-post error:', error);
+      setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'failed' }));
       const notification = new Notification(`❌ Auto-post failed: ${post.title}`, {
         body: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         icon: "/favicon.ico",
@@ -3350,6 +3468,106 @@ function App() {
         requireInteraction: true
       });
     }
+  };
+
+  // Function to reset execution tracking for a specific post
+  const resetPostExecution = (postId: string) => {
+    setExecutedPosts(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(postId);
+      newSet.delete(`notification-${postId}`);
+      return newSet;
+    });
+    setScheduledPostsStatus(prev => {
+      const newStatus = { ...prev };
+      delete newStatus[postId];
+      return newStatus;
+    });
+    console.log(`🔄 Reset execution tracking for post "${postId}"`);
+  };
+
+  // Function to clear all executed posts (useful for debugging)
+  const clearAllExecutedPosts = () => {
+    setExecutedPosts(new Set());
+    setScheduledPostsStatus({});
+    console.log(`🧹 Cleared all execution tracking`);
+  };
+
+  // Schedule modal functions
+  const openScheduleModal = () => {
+    // Initialize modal with current post settings or defaults
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 15); // Default to 15 minutes from now
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    setModalScheduleTime(`${year}-${month}-${day}T${hours}:${minutes}`);
+    setModalTimezone(timezone);
+    setModalAutoPostEnabled(autoPostEnabled);
+    setModalAutoPostPlatforms([...autoPostPlatforms]);
+    setModalNotificationEnabled(true);
+    setShowScheduleModal(true);
+  };
+
+  const handleScheduleConfirm = () => {
+    // Validate authentication for selected platforms
+    if (modalAutoPostEnabled && modalAutoPostPlatforms.length > 0) {
+      const unauthenticatedPlatforms = modalAutoPostPlatforms.filter(
+        platform => !auth[platform].isAuthenticated
+      );
+      
+      if (unauthenticatedPlatforms.length > 0) {
+        // Show error notification
+        if (Notification.permission === "granted") {
+          new Notification(`🚫 Authentication Required`, {
+            body: `Cannot schedule auto-posting: ${unauthenticatedPlatforms.join(', ')} ${unauthenticatedPlatforms.length === 1 ? 'is' : 'are'} not authenticated. Please log in first.`,
+            icon: "/favicon.ico",
+            tag: `auth-error-${currentPostId}`,
+            requireInteraction: true
+          });
+        }
+        
+        // Log the error
+        console.error(`🚫 Scheduling failed: Unauthenticated platforms detected: ${unauthenticatedPlatforms.join(', ')}`);
+        
+        // Don't close modal, let user fix the issue
+        return;
+      }
+    }
+    
+    // Apply the modal settings to the current post
+    setScheduleTime(modalScheduleTime);
+    setTimezone(modalTimezone);
+    setAutoPostEnabled(modalAutoPostEnabled);
+    setAutoPostPlatforms([...modalAutoPostPlatforms]);
+    
+    // Save the current post with new schedule settings
+    saveCurrentPost();
+    
+    // Close modal
+    setShowScheduleModal(false);
+    
+    // Show confirmation
+    const scheduledFor = formatTimezoneTime(modalScheduleTime, modalTimezone);
+    const platforms = modalAutoPostEnabled && modalAutoPostPlatforms.length > 0 
+      ? ` to ${modalAutoPostPlatforms.join(', ')}` 
+      : '';
+    
+    if (modalNotificationEnabled && Notification.permission === "granted") {
+      new Notification(`📅 Post Scheduled`, {
+        body: `"${posts.find(p => p.id === currentPostId)?.title || 'Current post'}" scheduled for ${scheduledFor}${platforms}`,
+        icon: "/favicon.ico",
+        tag: `schedule-confirm-${currentPostId}`,
+        requireInteraction: false
+      });
+    }
+  };
+
+  const cancelScheduleModal = () => {
+    setShowScheduleModal(false);
   };
 
   useEffect(() => {
@@ -3378,15 +3596,48 @@ function App() {
       posts.forEach((post) => {
         if (!post.scheduleTime) return;
         
+        // Skip if already executed or currently executing
+        if (executedPosts.has(post.id) || scheduledPostsStatus[post.id] === 'executing' || scheduledPostsStatus[post.id] === 'completed') {
+          return;
+        }
+        
         const target = new Date(post.scheduleTime);
         const delay = target.getTime() - now.getTime();
         
-        if (delay <= 0) return;
+        // Handle past scheduled times
+        if (delay <= 0) {
+          const minutesLate = Math.abs(Math.round(delay / (1000 * 60)));
+          
+          // If it's within the last 5 minutes and auto-posting is enabled, execute immediately
+          if (minutesLate <= 5 && post.autoPost?.enabled && post.autoPost.platforms.length > 0) {
+            console.log(`🚀 Executing overdue auto-post for "${post.title}" immediately`);
+            setExecutedPosts(prev => new Set([...prev, post.id])); // Mark as executed immediately
+            handleAutoPostForScheduledPost(post).catch(error => {
+              console.error(`❌ Failed to execute overdue post "${post.title}":`, error);
+            });
+          } else if (minutesLate <= 60 && !executedPosts.has(`notification-${post.id}`)) {
+            // Show a notification for recently missed posts (only once)
+            setExecutedPosts(prev => new Set([...prev, `notification-${post.id}`])); // Prevent duplicate notifications
+            if (Notification.permission === "granted") {
+              new Notification(`⚠️ Missed Scheduled Post: ${post.title}`, {
+                body: `This post was scheduled ${minutesLate} minutes ago. ${post.autoPost?.enabled ? 'Auto-posting was enabled but may have failed.' : 'Click to post manually.'}`,
+                icon: "/favicon.ico",
+                tag: `missed-post-${post.id}`,
+                requireInteraction: true
+              });
+            }
+          }
+          return;
+        }
         
-        console.log(`⏰ Reminder set for "${post.title}" at ${formatTimezoneTime(post.scheduleTime, post.timezone)} (in ${Math.round(delay / 1000)} seconds)`);
+        // Mark as pending
+        setScheduledPostsStatus(prev => ({ ...prev, [post.id]: 'pending' }));
         
         const timeout = setTimeout(async () => {
           try {
+            // Mark as executed to prevent re-execution
+            setExecutedPosts(prev => new Set([...prev, post.id]));
+            
             // Check if auto-posting is enabled for this post
             if (post.autoPost?.enabled && post.autoPost.platforms.length > 0) {
               console.log(`🤖 Auto-posting "${post.title}" to platforms:`, post.autoPost.platforms);
@@ -4150,9 +4401,30 @@ function App() {
                           {post.content ? `${post.content.substring(0, 60)}${post.content.length > 60 ? '...' : ''}` : 'No content'}
                         </p>
                         {post.scheduleTime && (
-                          <p className={`text-xs mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                            📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className={`text-xs ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                              📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
+                            </p>
+                            {post.autoPost?.enabled && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                scheduledPostsStatus[post.id] === 'pending' 
+                                  ? (darkMode ? 'bg-yellow-800 text-yellow-200' : 'bg-yellow-100 text-yellow-800')
+                                  : scheduledPostsStatus[post.id] === 'executing'
+                                  ? (darkMode ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-800')
+                                  : scheduledPostsStatus[post.id] === 'completed'
+                                  ? (darkMode ? 'bg-green-800 text-green-200' : 'bg-green-100 text-green-800')
+                                  : scheduledPostsStatus[post.id] === 'failed'
+                                  ? (darkMode ? 'bg-red-800 text-red-200' : 'bg-red-100 text-red-800')
+                                  : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600')
+                              }`}>
+                                {scheduledPostsStatus[post.id] === 'pending' && '⏳ Scheduled'}
+                                {scheduledPostsStatus[post.id] === 'executing' && '🚀 Posting'}
+                                {scheduledPostsStatus[post.id] === 'completed' && '✅ Posted'}
+                                {scheduledPostsStatus[post.id] === 'failed' && '❌ Failed'}
+                                {!scheduledPostsStatus[post.id] && '🤖 Auto-post'}
+                              </span>
+                            )}
+                          </div>
                         )}
                         {post.images && post.images.length > 0 && (
                           <p className={`text-xs mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
@@ -4166,6 +4438,7 @@ function App() {
                             ✏️ Active
                           </span>
                         )}
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -5035,163 +5308,49 @@ function App() {
         </div>
 
         <div className="mb-4">
-          <label className={`block mb-1 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-            Schedule Post
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <input
-              type="datetime-local"
-              value={scheduleTime}
-              onChange={(e) => setScheduleTime(e.target.value)}
-              className={`border border-gray-300 rounded-lg px-3 py-2 text-sm ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800"}`}
-            />
-            <select
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className={`border border-gray-300 rounded-lg px-3 py-2 text-sm ${darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-800"}`}
-            >
-              <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-                🔍 Auto-detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-              </option>
-              {commonTimezones.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {scheduleTime && (
-            <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-              📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
-            </p>
-          )}
-          
-          {/* Auto-posting configuration */}
-          <div className="mt-3 p-3 rounded-lg border" style={{
-            backgroundColor: darkMode ? '#374151' : '#f9fafb',
-            borderColor: darkMode ? '#4b5563' : '#e5e7eb'
-          }}>
-            <div className="flex items-center gap-2 mb-2">
-              <input
-                type="checkbox"
-                id="auto-post-enabled"
-                checked={autoPostEnabled}
-                onChange={(e) => {
-                  setAutoPostEnabled(e.target.checked);
-                  if (!e.target.checked) {
-                    setAutoPostPlatforms([]);
-                  }
-                }}
-                className="rounded"
-              />
-              <label htmlFor="auto-post-enabled" className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                🤖 Auto-post to selected platforms
-              </label>
-            </div>
-            
-            {autoPostEnabled && (
-              <div className="ml-6">
-                <p className={`text-xs mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  Select platforms to automatically post to at the scheduled time:
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).map((platform) => {
-                    const isAuthenticated = auth[platform].isAuthenticated;
-                    const isSelected = autoPostPlatforms.includes(platform);
-                    
-                    return (
-                      <label
-                        key={platform}
-                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                          isAuthenticated 
-                            ? (isSelected 
-                                ? (darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800')
-                                : (darkMode ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-100 hover:bg-gray-200')
-                              )
-                            : (darkMode ? 'bg-gray-700 text-gray-500' : 'bg-gray-50 text-gray-400')
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={!isAuthenticated}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setAutoPostPlatforms(prev => [...prev, platform]);
-                            } else {
-                              setAutoPostPlatforms(prev => prev.filter(p => p !== platform));
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <span className="text-xs">
-                          {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                          {!isAuthenticated && ' (Login required)'}
-                          {isAuthenticated && ' ✅'}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-                {autoPostPlatforms.length === 0 && (
-                  <p className={`text-xs mt-2 ${darkMode ? "text-yellow-400" : "text-yellow-600"}`}>
-                    ⚠️ Select at least one platform for auto-posting
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                🔔 Notifications:
-              </span>
-              {notificationStatus === 'granted' && (
-                <span className="text-xs text-green-600">✅ Enabled</span>
-              )}
-              {notificationStatus === 'denied' && (
-                <span className="text-xs text-red-600">❌ Blocked</span>
-              )}
-              {notificationStatus === 'unsupported' && (
-                <span className="text-xs text-orange-600">⚠️ Unsupported</span>
-              )}
-              {notificationStatus === 'unknown' && (
-                <span className="text-xs text-yellow-600">❓ Unknown</span>
-              )}
-            </div>
+          <div className="flex items-center justify-between mb-2">
+            <label className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Schedule Post
+            </label>
             <button
-              onClick={async () => {
-                if (!("Notification" in window)) {
-                  alert("❌ This browser doesn't support notifications.");
-                  return;
-                }
-                
-                if (Notification.permission === 'granted') {
-                  new Notification("🧪 Test Notification", {
-                    body: "Notifications are working correctly!",
-                    icon: "/favicon.ico"
-                  });
-                  alert("✅ Test notification sent! Check if you received it.");
-                } else {
-                  const permission = await Notification.requestPermission();
-                  if (permission === 'granted') {
-                    setNotificationStatus('granted');
-                    new Notification("🧪 Test Notification", {
-                      body: "Notifications are now enabled!",
-                      icon: "/favicon.ico"
-                    });
-                    alert("✅ Notifications enabled! Test notification sent.");
-                  } else {
-                    setNotificationStatus('denied');
-                    alert("❌ Please enable notifications in your browser settings.");
-                  }
-                }
-              }}
-              className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-gray-600 hover:bg-gray-500 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"}`}
+              onClick={openScheduleModal}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                darkMode 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
             >
-              🧪 Test
+              📅 Schedule Post
             </button>
           </div>
+          
+          {scheduleTime && (
+            <div className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                    📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
+                  </p>
+                  {autoPostEnabled && autoPostPlatforms.length > 0 && (
+                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      🤖 Auto-posting to: {autoPostPlatforms.join(', ')}
+                    </p>
+                  )}
+                  {(!autoPostEnabled || autoPostPlatforms.length === 0) && (
+                    <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      🔔 Reminder only (no auto-posting)
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={openScheduleModal}
+                  className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Posting Status */}
@@ -6092,6 +6251,207 @@ function App() {
                   }`}
                 >
                   Logout ({selectedLogoutPlatforms.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Post Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`max-w-md w-full rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">📅 Schedule Post</h3>
+                <button
+                  onClick={cancelScheduleModal}
+                  className={`text-gray-400 hover:text-gray-600 ${darkMode ? 'hover:text-gray-300' : ''}`}
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Date and Time */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    When to post
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="datetime-local"
+                      value={modalScheduleTime}
+                      onChange={(e) => setModalScheduleTime(e.target.value)}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-300'}`}
+                    />
+                    <select
+                      value={modalTimezone}
+                      onChange={(e) => setModalTimezone(e.target.value)}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-800 border-gray-300'}`}
+                    >
+                      <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>
+                        🔍 Auto-detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                      </option>
+                      {commonTimezones.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {modalScheduleTime && (
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      📅 Will be scheduled for: {formatTimezoneTime(modalScheduleTime, modalTimezone)}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Auto-posting */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="modal-auto-post"
+                      checked={modalAutoPostEnabled}
+                      onChange={(e) => {
+                        setModalAutoPostEnabled(e.target.checked);
+                        if (!e.target.checked) {
+                          setModalAutoPostPlatforms([]);
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <label htmlFor="modal-auto-post" className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      🤖 Auto-post to platforms
+                    </label>
+                  </div>
+                  
+                  {modalAutoPostEnabled && (
+                    <div className="space-y-2">
+                      <div className="flex gap-1 mb-2">
+                        <button
+                          onClick={() => {
+                            const authenticatedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
+                              platform => auth[platform].isAuthenticated
+                            );
+                            setModalAutoPostPlatforms(authenticatedPlatforms);
+                          }}
+                          className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-green-700 hover:bg-green-600 text-green-200' : 'bg-green-100 hover:bg-green-200 text-green-800'}`}
+                        >
+                          All
+                        </button>
+                        <button
+                          onClick={() => setModalAutoPostPlatforms([])}
+                          className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-red-700 hover:bg-red-600 text-red-200' : 'bg-red-100 hover:bg-red-200 text-red-800'}`}
+                        >
+                          None
+                        </button>
+                      </div>
+                      
+                                              <div className="grid grid-cols-2 gap-2">
+                          {(['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).map((platform) => {
+                            const isAuthenticated = auth[platform].isAuthenticated;
+                            const isSelected = modalAutoPostPlatforms.includes(platform);
+                            
+                            return (
+                              <label
+                                key={platform}
+                                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors text-xs ${
+                                  isAuthenticated 
+                                    ? (isSelected 
+                                        ? (darkMode ? 'bg-blue-900 text-blue-200 border border-blue-700' : 'bg-blue-100 text-blue-800 border border-blue-300')
+                                        : (darkMode ? 'bg-gray-600 hover:bg-gray-500 border border-gray-500' : 'bg-gray-100 hover:bg-gray-200 border border-gray-300')
+                                      )
+                                    : (isSelected
+                                        ? (darkMode ? 'bg-red-900 text-red-200 border border-red-700' : 'bg-red-100 text-red-800 border border-red-300')
+                                        : (darkMode ? 'bg-gray-700 text-gray-500 border border-gray-600' : 'bg-gray-50 text-gray-400 border border-gray-200')
+                                      )
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setModalAutoPostPlatforms(prev => [...prev, platform]);
+                                    } else {
+                                      setModalAutoPostPlatforms(prev => prev.filter(p => p !== platform));
+                                    }
+                                  }}
+                                  className="rounded"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium">
+                                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                                  </div>
+                                  <div className="opacity-75">
+                                    {!isAuthenticated && isSelected && '⚠️ Not authenticated'}
+                                    {!isAuthenticated && !isSelected && 'Login required'}
+                                    {isAuthenticated && 'Ready'}
+                                  </div>
+                                </div>
+                                {isAuthenticated && <span className="text-green-500">✅</span>}
+                                {!isAuthenticated && isSelected && <span className="text-red-500">⚠️</span>}
+                                {!isAuthenticated && !isSelected && <span className="text-gray-400">🔒</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Warning for unauthenticated platforms */}
+                        {modalAutoPostEnabled && modalAutoPostPlatforms.some(platform => !auth[platform].isAuthenticated) && (
+                          <div className={`text-xs p-2 rounded border ${darkMode ? 'bg-red-900 text-red-200 border-red-700' : 'bg-red-50 text-red-800 border-red-300'}`}>
+                            ⚠️ <strong>Authentication Required:</strong> {modalAutoPostPlatforms.filter(platform => !auth[platform].isAuthenticated).join(', ')} {modalAutoPostPlatforms.filter(platform => !auth[platform].isAuthenticated).length === 1 ? 'is' : 'are'} not authenticated. Please log in to these platforms before scheduling.
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Notifications */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="modal-notifications"
+                      checked={modalNotificationEnabled}
+                      onChange={(e) => setModalNotificationEnabled(e.target.checked)}
+                      className="rounded"
+                    />
+                    <label htmlFor="modal-notifications" className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      🔔 Send browser notification when scheduled
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={cancelScheduleModal}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    darkMode 
+                      ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleScheduleConfirm}
+                  disabled={!modalScheduleTime || (modalAutoPostEnabled && modalAutoPostPlatforms.some(platform => !auth[platform].isAuthenticated))}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    modalScheduleTime && !(modalAutoPostEnabled && modalAutoPostPlatforms.some(platform => !auth[platform].isAuthenticated))
+                      ? (darkMode 
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                          : 'bg-blue-500 hover:bg-blue-600 text-white')
+                      : (darkMode 
+                          ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed')
+                  }`}
+                >
+                  📅 Schedule Post
                 </button>
               </div>
             </div>
