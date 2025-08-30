@@ -2574,10 +2574,10 @@ function App() {
             switchToPost(remainingPosts[0].id);
           } else {
             setCurrentPostId('');
-            setText('');
-            setAttachedImages([]);
-            setPlatformImageSelections({});
-            setHasExplicitSelection({});
+        setText('');
+        setAttachedImages([]);
+        setPlatformImageSelections({});
+        setHasExplicitSelection({});
           }
         }
       }
@@ -2781,7 +2781,7 @@ function App() {
       const successful = results.filter(r => r.success);
       const failed = results.filter(r => !r.success);
       
-
+        
       
       if (successful.length > 0) {
         // Track the published post for any successful platforms
@@ -2789,11 +2789,11 @@ function App() {
         if (currentPost) {
           const platformResults: PlatformPostResult[] = [
             ...successful.map(r => ({
-              platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
-              success: true,
-              postId: r.postId || '',
-              postUrl: r.postUrl || '',
-              publishedAt: new Date().toISOString(),
+            platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
+            success: true,
+            postId: r.postId || '',
+            postUrl: r.postUrl || '',
+            publishedAt: new Date().toISOString(),
             })),
             ...failed.map(r => ({
               platform: connectedPlatforms.find(p => platformNames[p] === r.platform)!,
@@ -2803,7 +2803,7 @@ function App() {
             }))
           ];
           
-  
+          
           addPublishedPost(currentPost, platformResults);
           
           // Remove the post from the active posts list
@@ -2843,9 +2843,9 @@ function App() {
         if (successful.length === results.length) {
           alert(`✅ Successfully posted to all platforms!\n\n📤 Posted to: ${successful.map(r => r.platform).join(', ')}`);
         } else {
-          const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
-          const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
-          alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
+        const successMsg = `✅ Successful: ${successful.map(r => r.platform).join(', ')}`;
+        const failMsg = `❌ Failed: ${failed.map(r => `${r.platform} (${r.error})`).join(', ')}`;
+        alert(`⚠️ Partial success:\n\n${successMsg}\n\n${failMsg}`);
         }
       } else {
         const failMsg = failed.map(r => `${r.platform}: ${r.error}`).join('\n');
@@ -3672,17 +3672,17 @@ function App() {
               // Create notification for manual posting
               const notification = new Notification(`⏰ Post Reminder: ${post.title}`, {
                 body: `Time to post "${post.title}"!\n${formatTimezoneTime(post.scheduleTime, post.timezone)}`,
-                icon: "/favicon.ico",
+              icon: "/favicon.ico",
                 tag: `post-reminder-${post.id}`,
-                requireInteraction: true,
-                silent: false
-              });
+              requireInteraction: true,
+              silent: false
+            });
 
-              // Also show browser alert as fallback
+            // Also show browser alert as fallback
               alert(`⏰ REMINDER: Time to post "${post.title}"!\n\n${formatTimezoneTime(post.scheduleTime, post.timezone)}\n\nClick on "📝 Posts" to switch to this post.`);
 
-              // Auto-close notification after 15 seconds
-              setTimeout(() => notification.close(), 15000);
+            // Auto-close notification after 15 seconds
+            setTimeout(() => notification.close(), 15000);
             }
             
             console.log(`✅ Scheduled action triggered for "${post.title}"`);
@@ -4429,8 +4429,8 @@ function App() {
                         {post.scheduleTime && (
                           <div className="flex items-center gap-2 mt-1">
                             <p className={`text-xs ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                              📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
-                            </p>
+                            📅 {formatTimezoneTime(post.scheduleTime, post.timezone)}
+                          </p>
                             {post.autoPost?.enabled && (
                               <span className={`text-xs px-1.5 py-0.5 rounded ${
                                 scheduledPostsStatus[post.id] === 'pending' 
@@ -5337,7 +5337,7 @@ function App() {
           <div className="flex items-center justify-between mb-2">
             <label className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
               Schedule Post
-            </label>
+          </label>
             <button
               onClick={openScheduleModal}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -5355,26 +5355,26 @@ function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                    📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
+              📅 Scheduled for: {formatTimezoneTime(scheduleTime, timezone)}
                   </p>
                   {autoPostEnabled && autoPostPlatforms.length > 0 && (
                     <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                       🤖 Auto-posting to: {autoPostPlatforms.join(', ')}
-                    </p>
-                  )}
+            </p>
+          )}
                   {(!autoPostEnabled || autoPostPlatforms.length === 0) && (
                     <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                       🔔 Reminder only (no auto-posting)
                     </p>
-                  )}
-                </div>
-                <button
+              )}
+            </div>
+            <button
                   onClick={openScheduleModal}
                   className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-gray-600 hover:bg-gray-500 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
                 >
                   Edit
-                </button>
-              </div>
+            </button>
+          </div>
             </div>
           )}
         </div>
@@ -6297,7 +6297,7 @@ function App() {
                 >
                   ✕
                 </button>
-              </div>
+    </div>
               
               <div className="space-y-4">
                 {/* Date and Time */}

@@ -539,18 +539,22 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
       
       for (const file of req.files) {
         try {
-          // Upload media to Mastodon - use Node.js FormData
-          const mediaFormData = new FormDataLib();
-          mediaFormData.append('file', file.buffer, {
-            filename: file.originalname,
-            contentType: file.mimetype
-          });
+          // Upload media to Mastodon - try with built-in FormData
+          const mediaFormData = new FormData();
           
-          const mediaResponse = await fetch(`${instanceUrl}/api/v2/media`, {
+          // Create a Blob from the buffer
+          const fileBlob = new Blob([file.buffer], { type: file.mimetype });
+          
+          mediaFormData.append('file', fileBlob, file.originalname);
+          mediaFormData.append('description', 'Image uploaded via social-media-kit');
+          
+          const uploadUrl = `${instanceUrl}/api/v1/media`;
+          
+          const mediaResponse = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              ...mediaFormData.getHeaders()
+              'Authorization': `Bearer ${accessToken}`
+              // Let fetch automatically set Content-Type for FormData
             },
             body: mediaFormData
           });
@@ -560,7 +564,8 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
             mediaIds.push(mediaData.id);
             console.log(`✅ Uploaded image to Mastodon: ${mediaData.id}`);
           } else {
-            console.warn(`❌ Failed to upload image to Mastodon:`, await mediaResponse.text());
+            const errorText = await mediaResponse.text();
+            console.warn(`❌ Failed to upload image to Mastodon (${mediaResponse.status} ${mediaResponse.statusText}):`, errorText);
           }
         } catch (uploadError) {
           console.warn('❌ Error uploading image to Mastodon:', uploadError);
