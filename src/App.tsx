@@ -3811,7 +3811,7 @@ function App() {
             handleAutoPostForScheduledPost(post).catch(error => {
               console.error(`❌ Failed to execute overdue post "${post.title}":`, error);
             });
-          } else if (minutesLate <= 60 && !executedPosts.has(`notification-${post.id}`)) {
+          } else if (minutesLate <= 60 && !executedPosts.has(`notification-${post.id}`) && !executedPosts.has(`missed-${post.id}`)) {
             // Only show missed post notifications if the post was created more than 2 minutes ago
             // This prevents notifications when creating new posts or loading the app
             const postCreatedAt = new Date(post.createdAt);
@@ -3820,7 +3820,8 @@ function App() {
             
             if (minutesSinceCreated > 2) {
               // Show a notification for recently missed posts (only once)
-              setExecutedPosts(prev => new Set([...prev, `notification-${post.id}`])); // Prevent duplicate notifications
+              setExecutedPosts(prev => new Set([...prev, `notification-${post.id}`, `missed-${post.id}`])); // Prevent duplicate notifications with multiple keys
+              console.log(`📢 Showing missed post notification for "${post.title}" (${minutesLate} minutes late)`);
               if (Notification.permission === "granted") {
                 new Notification(`⚠️ Missed Scheduled Post: ${post.title}`, {
                   body: `This post was scheduled ${minutesLate} minutes ago. ${post.autoPost?.enabled ? 'Auto-posting was enabled but may have failed.' : 'Click to post manually.'}`,
@@ -3879,7 +3880,7 @@ function App() {
     return () => {
       timeouts.forEach(timeout => clearTimeout(timeout));
     };
-  }, [posts]);
+  }, [posts, executedPosts]); // Include executedPosts to ensure proper tracking
 
   // Add unified tagging functions
   const addPersonMapping = () => {
@@ -4529,9 +4530,9 @@ function App() {
 
         {showPostManager && (
           <div className={`mb-6 p-4 border rounded-xl ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
-              <div className="flex gap-2">
+            <div className="mb-3">
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
                 <button
                   onClick={toggleAutoSync}
                   className={`text-sm px-3 py-1 rounded-lg ${
@@ -4547,40 +4548,51 @@ function App() {
                 >
                   {autoSyncEnabled ? "🔄 Auto-Sync ON" : "⏸️ Auto-Sync OFF"}
                 </button>
-                <button
-                  onClick={loadPostsFromDisk}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
-                  title="Load posts from file"
-                >
-                  📁 Load
-                </button>
-                <button
-                  onClick={savePostsToDisk}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
-                  title="Save posts to file"
-                >
-                  💾 Save
-                </button>
-                <button
-                  onClick={createNewPost}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
-                >
-                  ➕ New Post
-                </button>
-                <button
-                  onClick={() => setShowPublishedPosts(true)}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"}`}
-                  title="View published posts"
-                >
-                  ✅ Published ({publishedPosts.length})
-                </button>
-                <button
-                  onClick={() => setShowDeletedPosts(true)}
-                  className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
-                  title="View deleted posts"
-                >
-                  🗑️ Deleted ({getActualDeletedPosts().length})
-                </button>
+              </div>
+              
+              {/* Action buttons organized in logical groups */}
+              <div className="flex flex-wrap gap-3 justify-end">
+                {/* File operations */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={loadPostsFromDisk}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                    title="Load posts from file"
+                  >
+                    📁 Load
+                  </button>
+                  <button
+                    onClick={savePostsToDisk}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-purple-600 hover:bg-purple-700 text-white" : "bg-purple-500 hover:bg-purple-600 text-white"}`}
+                    title="Save posts to file"
+                  >
+                    💾 Save
+                  </button>
+                </div>
+                
+                {/* Post management */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={createNewPost}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
+                  >
+                    ➕ New Post
+                  </button>
+                  <button
+                    onClick={() => setShowPublishedPosts(true)}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-emerald-500 hover:bg-emerald-600 text-white"}`}
+                    title="View published posts"
+                  >
+                    ✅ Published ({publishedPosts.length})
+                  </button>
+                  <button
+                    onClick={() => setShowDeletedPosts(true)}
+                    className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                    title="View deleted posts"
+                  >
+                    🗑️ Deleted ({getActualDeletedPosts().length})
+                  </button>
+                </div>
               </div>
             </div>
             
