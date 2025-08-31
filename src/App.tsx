@@ -5245,6 +5245,44 @@ function App() {
           )}
         </div>
 
+        {/* Character and Word Counter */}
+        <div className={`mb-4 px-3 py-2 rounded-lg ${darkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex gap-4">
+              <span className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                📝 Words: <span className="font-medium">{text.trim() === '' ? 0 : text.trim().split(/\s+/).length}</span>
+              </span>
+              <span className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                🔤 Characters: <span className="font-medium">{text.length}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-1 rounded ${
+                text.length > PLATFORM_LIMITS[selectedPlatform] 
+                  ? darkMode ? "bg-red-600 text-white" : "bg-red-100 text-red-800"
+                  : text.length > PLATFORM_LIMITS[selectedPlatform] * 0.9
+                  ? darkMode ? "bg-yellow-600 text-white" : "bg-yellow-100 text-yellow-800"
+                  : darkMode ? "bg-green-600 text-white" : "bg-green-100 text-green-800"
+              }`}>
+                {selectedPlatform === 'linkedin' && '💼'}
+                {selectedPlatform === 'twitter' && '🐦'}
+                {selectedPlatform === 'mastodon' && '🐘'}
+                {selectedPlatform === 'bluesky' && '🦋'}
+                {' '}
+                {text.length}/{PLATFORM_LIMITS[selectedPlatform]}
+                {text.length > PLATFORM_LIMITS[selectedPlatform] && (
+                  <span className="ml-1">⚠️</span>
+                )}
+              </span>
+              {text.length > PLATFORM_LIMITS[selectedPlatform] && (
+                <span className={`text-xs ${darkMode ? "text-red-400" : "text-red-600"}`}>
+                  Will be chunked into {Math.ceil(text.length / PLATFORM_LIMITS[selectedPlatform])} parts
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Image Upload Section */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
