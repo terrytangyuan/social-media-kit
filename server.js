@@ -59,6 +59,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('dist'));
 
+// Serve static files from public directory (favicon, manifest, etc.)
+app.use(express.static('public', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.svg')) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+    } else if (path.endsWith('.ico')) {
+      res.setHeader('Content-Type', 'image/x-icon');
+    } else if (path.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (path.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
+
 // OAuth configuration endpoint
 app.get('/api/oauth/config', (req, res) => {
   const config = {

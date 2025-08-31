@@ -1,0 +1,43 @@
+{
+  "name": "Social Media Kit",
+  "short_name": "SMKit",
+  "description": "Comprehensive social media management tool for multiple platforms",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["productivity", "social", "utilities"],
+  "screenshots": [
+    {
+      "src": "/screenshots/main-interface.png",
+      "sizes": "800x600",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Main interface showing post composition and platform selection"
+    }
+  ]
+}
