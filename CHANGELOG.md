@@ -15,36 +15,15 @@ TBA
     - Twitter/X: Up to 4 images, 5MB each
     - Mastodon: Up to 4 images, 8MB each
     - Bluesky: Up to 4 images, 10MB each
-  - **Enhanced UI**: Modern multi-image selection with grid preview and individual image removal
-  - **Smart Validation**: Real-time validation of file types, sizes, and platform limits
-  - **Interactive Preview**: Click to expand images, drag-and-drop reordering, numbered indicators
-  - **Modification Controls**: Individual remove buttons, remove all option, visual drag handles
-  - **Improved Post Preview**: Smart grid layout adapting to image count with numbered overlays
-  - **Auto-cleanup**: Images automatically cleared after successful posting
-  - **Smart Platform Switching**: Interactive image selection modal when switching platforms with excess images
-  - **Platform-Specific Image Selection**: Each platform maintains its own selected image set from the uploaded collection
-  - **Visual Image Selection Modal**: Rich interface for selecting specific images per platform with preview and selection indicators
-  - **Intelligent Selection Behavior**: Only prompts for image selection on first switch; respects user choices and doesn't re-prompt unless explicitly requested
-  - **Manual Selection Override**: "Select Images" button always available for users to manually adjust their platform-specific selections
-  - **Visual Indicators**: Clear display of current image count vs platform limits with helpful hints
-  - **Platform-Specific Handling**: 
-    - LinkedIn: FormData upload via API with multiple images
-    - Twitter/X: Media upload with multiple image attachment via Twitter Media API
-    - Mastodon: Media upload with multiple image support via Mastodon Media API  
-    - Bluesky: Direct blob upload via client-side API calls
-  - **Server-Side Image Processing**: Full FormData handling with multer middleware for robust file uploads
 - **Multi-Platform Logout**: Enhanced logout functionality allowing users to selectively logout from multiple platforms
 - **Automatic Post Synchronization**: Posts now automatically sync to local storage, eliminating manual save requirements
 - **Unified Authentication Notifications**: Login success and authentication error messages now use the app's notification system
-  - **Non-Blocking Login Success**: Users no longer need to click "OK" after successful authentication
-  - **Consistent User Experience**: All authentication feedback uses the same elegant notification style
-  - **Improved Platform Names**: Updated Twitter references to "X/Twitter" for consistency
 - **Smart Tag Autocompletion**
 - **Automatic Posting on Schedule**
 
 ### 🐛 Bug Fixes
 
-- **Fixed missing copy button in Mastodon post preview**: Added individual copy buttons for Mastodon thread chunks, bringing it in line with Twitter and Bluesky functionality
+- **Fixed missing copy button in Mastodon post preview**
 - **API Integration Fixes**: Resolved Twitter media upload failures and Bluesky content-type issues
 
 
