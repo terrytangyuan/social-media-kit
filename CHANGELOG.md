@@ -2,6 +2,10 @@
 
 ## Under Development
 
+TBA
+
+## v0.2.3
+
 ### ✨ New Features
 
 - **Enhanced Image Upload Support**: Complete implementation of multiple image upload to first post
@@ -29,37 +33,20 @@
     - Mastodon: Media upload with multiple image support via Mastodon Media API  
     - Bluesky: Direct blob upload via client-side API calls
   - **Server-Side Image Processing**: Full FormData handling with multer middleware for robust file uploads
-- **API Integration Fixes**: Resolved Twitter media upload failures and Bluesky content-type issues
-- **Post Image Persistence**: Images are now saved with posts and restored when switching between posts or importing/exporting post data
-  - Images stored in post history with full metadata
-  - Platform-specific image selections preserved across sessions
-  - Export/import functionality includes image data (base64 encoded)
-  - Visual image indicators in post manager show image count per post
-  - **Auto-Save Functionality**: Images automatically saved on upload, removal, reordering, and platform selection changes
-  - **Pre-Export Saving**: Current post automatically saved before export to ensure no data loss
 - **Multi-Platform Logout**: Enhanced logout functionality allowing users to selectively logout from multiple platforms
-  - **Visual Platform Selection**: Interactive modal showing all authenticated platforms with checkboxes
-  - **Batch Logout**: Logout from multiple platforms simultaneously with confirmation
-  - **Smart UI**: Multi-platform logout button (🔓) only appears when logged into 2+ platforms
-  - **Individual Logout**: Existing single-platform logout functionality preserved alongside new multi-platform option
-  - **Consolidated Notifications**: Single notification shows all logout results instead of multiple alerts
-  - **Error Handling**: Shows partial success status when some platforms fail to logout
-  - **Select All Toggle**: Quick select/deselect all platforms button for convenient bulk operations
 - **Automatic Post Synchronization**: Posts now automatically sync to local storage, eliminating manual save requirements
-  - **Auto-Save on Changes**: Posts automatically saved whenever modified (with 1-second debounce)
-  - **Auto-Load on Startup**: Previously synced posts automatically restored when app opens
-  - **Smart Toggle Control**: Visual toggle button to enable/disable auto-sync in Post Manager
-  - **Background Synchronization**: Seamless saving without user intervention or notifications
-  - **Fallback Integration**: Works alongside existing manual save/load functionality
-  - **LocalStorage Backend**: Uses browser's localStorage for reliable local data persistence
 - **Unified Authentication Notifications**: Login success and authentication error messages now use the app's notification system
   - **Non-Blocking Login Success**: Users no longer need to click "OK" after successful authentication
   - **Consistent User Experience**: All authentication feedback uses the same elegant notification style
   - **Improved Platform Names**: Updated Twitter references to "X/Twitter" for consistency
+- **Smart Tag Autocompletion**
+- **Automatic Posting on Schedule**
 
 ### 🐛 Bug Fixes
 
 - **Fixed missing copy button in Mastodon post preview**: Added individual copy buttons for Mastodon thread chunks, bringing it in line with Twitter and Bluesky functionality
+- **API Integration Fixes**: Resolved Twitter media upload failures and Bluesky content-type issues
+
 
 ## v0.2.2
 
