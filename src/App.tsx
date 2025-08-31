@@ -526,17 +526,28 @@ function App() {
   const ensureValidAuth = async (platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): Promise<boolean> => {
     const authData = auth[platform];
     
-    // Check if already authenticated and not expired
-    if (authData.isAuthenticated && authData.accessToken && !isTokenExpired(authData)) {
+    // Check if not authenticated at all
+    if (!authData.isAuthenticated || !authData.accessToken) {
+      console.warn(`❌ Not authenticated with ${platform}`);
+      return false;
+    }
+    
+    // Check if token is not expired
+    if (!isTokenExpired(authData)) {
       return true;
     }
     
-    // If expired but we have a refresh token, try to refresh
-    if (isTokenExpired(authData) && authData.refreshToken) {
+    // Token is expired, try to refresh if we have a refresh token
+    if (authData.refreshToken) {
+      console.log(`🔄 Token expired for ${platform}, attempting refresh...`);
       const refreshed = await attemptTokenRefresh(platform);
       if (refreshed) {
+        console.log(`✅ Successfully refreshed ${platform} token`);
         return true;
       }
+      console.warn(`❌ Failed to refresh ${platform} token`);
+    } else {
+      console.warn(`❌ No refresh token available for ${platform}`);
     }
     
     // Authentication failed or refresh failed
@@ -2693,18 +2704,17 @@ function App() {
       console.error('Posting error:', error);
       
       // Handle authentication errors by automatically logging out
-      if (selectedPlatform === 'twitter' && error instanceof Error && error.message.includes('Authentication failed')) {
-        logout('twitter');
-        showNotification(`❌ X/Twitter authentication expired. You have been logged out. Please login again to continue posting.`);
-      } else if (selectedPlatform === 'linkedin' && error instanceof Error && error.message.includes('Authentication failed')) {
-        logout('linkedin');
-        showNotification(`❌ LinkedIn authentication expired. You have been logged out. Please login again to continue posting.`);
-      } else if (selectedPlatform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
-        logout('bluesky');
-        showNotification(`❌ Bluesky authentication expired. You have been logged out. Please login again to continue posting.`);
-      } else if (selectedPlatform === 'mastodon' && error instanceof Error && error.message.includes('Authentication failed')) {
-        logout('mastodon');
-        showNotification(`❌ Mastodon authentication expired. You have been logged out. Please login again to continue posting.`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isAuthError = errorMessage.includes('Authentication failed') || 
+                         errorMessage.includes('401') || 
+                         errorMessage.includes('Unauthorized') ||
+                         errorMessage.includes('session may have expired') ||
+                         errorMessage.includes('reconnect your') ||
+                         errorMessage.includes('Invalid access token');
+      
+      if (isAuthError) {
+        logout(selectedPlatform);
+        showNotification(`❌ ${selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} authentication expired. You have been logged out. Please login again to continue posting.`);
       } else {
         showNotification(`❌ Failed to post to ${selectedPlatform}: ${error}`);
       }
@@ -2855,14 +2865,16 @@ function App() {
           console.error(`Error posting to ${platform}:`, error);
           
           // Handle authentication errors by automatically logging out
-          if (platform === 'twitter' && error instanceof Error && error.message.includes('Authentication failed')) {
-            logout('twitter');
-          } else if (platform === 'linkedin' && error instanceof Error && error.message.includes('Authentication failed')) {
-            logout('linkedin');
-          } else if (platform === 'bluesky' && error instanceof Error && error.message.includes('Authentication failed')) {
-            logout('bluesky');
-          } else if (platform === 'mastodon' && error instanceof Error && error.message.includes('Authentication failed')) {
-            logout('mastodon');
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const isAuthError = errorMessage.includes('Authentication failed') || 
+                             errorMessage.includes('401') || 
+                             errorMessage.includes('Unauthorized') ||
+                             errorMessage.includes('session may have expired') ||
+                             errorMessage.includes('reconnect your') ||
+                             errorMessage.includes('Invalid access token');
+          
+          if (isAuthError) {
+            logout(platform);
           }
           
           results.push({ 
@@ -3506,7 +3518,14 @@ function App() {
           
           // Handle authentication errors by automatically logging out
           const errorMessage = error instanceof Error ? error.message : String(error);
-          if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('Authentication failed')) {
+          const isAuthError = errorMessage.includes('Authentication failed') || 
+                             errorMessage.includes('401') || 
+                             errorMessage.includes('Unauthorized') ||
+                             errorMessage.includes('session may have expired') ||
+                             errorMessage.includes('reconnect your') ||
+                             errorMessage.includes('Invalid access token');
+          
+          if (isAuthError) {
             console.warn(`🔓 Authentication failed for ${platform}, logging out automatically`);
             logout(platform);
           }

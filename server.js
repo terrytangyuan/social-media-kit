@@ -341,9 +341,34 @@ app.post('/api/oauth/refresh', async (req, res) => {
       }
       
     } else if (platform === 'twitter') {
-      // Twitter OAuth 2.0 with PKCE doesn't use refresh tokens in the same way
-      // Twitter access tokens are long-lived, but we can implement re-authorization if needed
-      throw new Error('Twitter token refresh not supported - tokens are long-lived');
+      // Twitter OAuth 2.0 with PKCE does support refresh tokens
+      tokenUrl = 'https://api.twitter.com/2/oauth2/token';
+      
+      const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+      if (!clientSecret) {
+        throw new Error('Twitter client secret not configured');
+      }
+      
+      const params = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: process.env.TWITTER_CLIENT_ID,
+      });
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${clientSecret}`).toString('base64')}`
+        },
+        body: params
+      });
+      
+      tokenData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Twitter token refresh failed: ${tokenData.error_description || tokenData.error}`);
+      }
       
     } else if (platform === 'mastodon') {
       // Mastodon supports refresh tokens
