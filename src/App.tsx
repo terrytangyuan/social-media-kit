@@ -3763,15 +3763,23 @@ function App() {
               console.error(`❌ Failed to execute overdue post "${post.title}":`, error);
             });
           } else if (minutesLate <= 60 && !executedPosts.has(`notification-${post.id}`)) {
-            // Show a notification for recently missed posts (only once)
-            setExecutedPosts(prev => new Set([...prev, `notification-${post.id}`])); // Prevent duplicate notifications
-            if (Notification.permission === "granted") {
-              new Notification(`⚠️ Missed Scheduled Post: ${post.title}`, {
-                body: `This post was scheduled ${minutesLate} minutes ago. ${post.autoPost?.enabled ? 'Auto-posting was enabled but may have failed.' : 'Click to post manually.'}`,
-                icon: "/favicon.ico",
-                tag: `missed-post-${post.id}`,
-                requireInteraction: true
-              });
+            // Only show missed post notifications if the post was created more than 2 minutes ago
+            // This prevents notifications when creating new posts or loading the app
+            const postCreatedAt = new Date(post.createdAt);
+            const timeSinceCreated = now.getTime() - postCreatedAt.getTime();
+            const minutesSinceCreated = timeSinceCreated / (1000 * 60);
+            
+            if (minutesSinceCreated > 2) {
+              // Show a notification for recently missed posts (only once)
+              setExecutedPosts(prev => new Set([...prev, `notification-${post.id}`])); // Prevent duplicate notifications
+              if (Notification.permission === "granted") {
+                new Notification(`⚠️ Missed Scheduled Post: ${post.title}`, {
+                  body: `This post was scheduled ${minutesLate} minutes ago. ${post.autoPost?.enabled ? 'Auto-posting was enabled but may have failed.' : 'Click to post manually.'}`,
+                  icon: "/favicon.ico",
+                  tag: `missed-post-${post.id}`,
+                  requireInteraction: true
+                });
+              }
             }
           }
           return;
