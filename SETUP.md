@@ -130,12 +130,24 @@ Your Twitter application **must** be configured with specific settings for posti
 
 6. **Get Credentials**:
    - Go to **Keys and tokens** tab
-   - Copy your **Client ID** and **Client Secret**
+   - Copy your **Client ID** and **Client Secret** (for OAuth 2.0 tweet posting)
+   - Copy your **API Key**, **API Secret**, **Access Token**, and **Access Token Secret** (for OAuth 1.0a media uploads)
    - Add to your `.env` file:
      ```env
+     # OAuth 2.0 credentials (for tweet posting)
      TWITTER_CLIENT_ID=your_client_id_here
      TWITTER_CLIENT_SECRET=your_client_secret_here
+     
+     # OAuth 1.0a credentials (for media uploads)
+     TWITTER_API_KEY=your_api_key_here
+     TWITTER_API_SECRET=your_api_secret_here
+     TWITTER_ACCESS_TOKEN=your_access_token_here
+     TWITTER_ACCESS_TOKEN_SECRET=your_access_token_secret_here
      ```
+
+**Important**: For **image uploads** to work, you need both OAuth 2.0 AND OAuth 1.0a credentials:
+- **OAuth 2.0** (Client ID/Secret) is used for posting tweets and user authentication
+- **OAuth 1.0a** (API Key/Secret + Access Token/Secret) is used for uploading media files
 
 ### Bluesky Authentication
 

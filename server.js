@@ -7,6 +7,8 @@ import multer from 'multer';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const FormDataLib = require('form-data');
+const OAuth = require('oauth-1.0a');
+const crypto = require('crypto-js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -572,36 +574,70 @@ app.post('/api/twitter/post', upload.any(), async (req, res) => {
     
     // Handle image uploads if present
     if (req.files && req.files.length > 0) {
-      console.log(`📷 Uploading ${req.files.length} images to Twitter...`);
+      console.log(`📷 Uploading ${req.files.length} images to Twitter using OAuth 1.0a...`);
       
-      for (const file of req.files) {
-        try {
-          // Upload media to Twitter - use built-in FormData with Blob
-          const mediaFormData = new FormData();
-          
-          // Create a Blob from the buffer
-          const fileBlob = new Blob([file.buffer], { type: file.mimetype });
-          mediaFormData.append('media', fileBlob, file.originalname);
-          
-          const mediaResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`
-              // Let fetch automatically set Content-Type for FormData
-            },
-            body: mediaFormData
-          });
-          
-          if (mediaResponse.ok) {
-            const mediaData = await mediaResponse.json();
-            mediaIds.push(mediaData.media_id_string);
-            console.log(`✅ Uploaded image to Twitter: ${mediaData.media_id_string}`);
-          } else {
-            const errorText = await mediaResponse.text();
-            console.warn(`❌ Failed to upload image to Twitter (${mediaResponse.status} ${mediaResponse.statusText}):`, errorText);
+      // Check if OAuth 1.0a credentials are configured
+      const consumerKey = process.env.TWITTER_API_KEY || process.env.TWITTER_CONSUMER_KEY;
+      const consumerSecret = process.env.TWITTER_API_SECRET || process.env.TWITTER_CONSUMER_SECRET;
+      const accessTokenKey = process.env.TWITTER_ACCESS_TOKEN;
+      const accessTokenSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET;
+      
+      if (!consumerKey || !consumerSecret || !accessTokenKey || !accessTokenSecret) {
+        console.warn('⚠️ OAuth 1.0a credentials not configured for Twitter media uploads');
+        console.warn('⚠️ Required env vars: TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET');
+        console.warn('⚠️ Images will not be uploaded. Text-only tweet will be posted.');
+      } else {
+        // Configure OAuth 1.0a
+        const oauth = OAuth({
+          consumer: { key: consumerKey, secret: consumerSecret },
+          signature_method: 'HMAC-SHA1',
+          hash_function(base_string, key) {
+            return crypto.HmacSHA1(base_string, key).toString(crypto.enc.Base64);
+          },
+        });
+        
+        const token = {
+          key: accessTokenKey,
+          secret: accessTokenSecret,
+        };
+        
+        for (const file of req.files) {
+          try {
+            // Upload media to Twitter using OAuth 1.0a
+            const mediaFormData = new FormDataLib();
+            mediaFormData.append('media', file.buffer, {
+              filename: file.originalname,
+              contentType: file.mimetype
+            });
+            
+            const requestData = {
+              url: 'https://upload.twitter.com/1.1/media/upload.json',
+              method: 'POST',
+            };
+            
+            // Generate OAuth 1.0a authorization header
+            const authHeader = oauth.toHeader(oauth.authorize(requestData, token));
+            
+            const mediaResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
+              method: 'POST',
+              headers: {
+                ...authHeader,
+                ...mediaFormData.getHeaders()
+              },
+              body: mediaFormData
+            });
+            
+            if (mediaResponse.ok) {
+              const mediaData = await mediaResponse.json();
+              mediaIds.push(mediaData.media_id_string);
+              console.log(`✅ Uploaded image to Twitter: ${mediaData.media_id_string}`);
+            } else {
+              const errorText = await mediaResponse.text();
+              console.error(`❌ Failed to upload image to Twitter (${mediaResponse.status}):`, errorText);
+            }
+          } catch (uploadError) {
+            console.error('❌ Error uploading image to Twitter:', uploadError);
           }
-        } catch (uploadError) {
-          console.warn('❌ Error uploading image to Twitter:', uploadError);
         }
       }
     }
@@ -677,13 +713,14 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
       
       for (const file of req.files) {
         try {
-          // Upload media to Mastodon - try with built-in FormData
-          const mediaFormData = new FormData();
+          // Upload media to Mastodon - use form-data library for Node.js
+          const mediaFormData = new FormDataLib();
           
-          // Create a Blob from the buffer
-          const fileBlob = new Blob([file.buffer], { type: file.mimetype });
-          
-          mediaFormData.append('file', fileBlob, file.originalname);
+          // Append the file buffer directly with proper options
+          mediaFormData.append('file', file.buffer, {
+            filename: file.originalname,
+            contentType: file.mimetype
+          });
           mediaFormData.append('description', 'Image uploaded via social-media-kit');
           
           const uploadUrl = `${instanceUrl}/api/v1/media`;
@@ -691,8 +728,8 @@ app.post('/api/mastodon/post', upload.any(), async (req, res) => {
           const mediaResponse = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${accessToken}`
-              // Let fetch automatically set Content-Type for FormData
+              'Authorization': `Bearer ${accessToken}`,
+              ...mediaFormData.getHeaders()
             },
             body: mediaFormData
           });

@@ -39,7 +39,7 @@ More screenshots can be found in [this folder](/screenshots).
 
 ### 🌐 **Multi-Platform Support**
 - **LinkedIn**: OAuth 2.0 integration with direct posting (3,000 character limit)
-- **Twitter/X**: OAuth 2.0 authentication with automatic thread creation (280 chars, or 25,000 with X Premium)
+- **Twitter/X**: Hybrid authentication - OAuth 2.0 for tweets + OAuth 1.0a for image uploads (280 chars, or 25,000 with X Premium)
 - **Mastodon**: OAuth 2.0 integration with instance-specific authentication and posting (500 character limit, configurable per instance)
 - **Bluesky**: App password authentication with native posting (300 character limit)
 - **Smart Chunking**: Automatic text splitting based on platform-specific character limits
@@ -67,7 +67,7 @@ More screenshots can be found in [this folder](/screenshots).
 ### 🔐 **OAuth & Authentication**
 - **Settings UI**: Built-in OAuth configuration panel with step-by-step instructions
 - **LinkedIn OAuth**: OAuth 2.0 with `w_member_social` scope for posting
-- **Twitter OAuth**: OAuth 2.0 with `tweet.read`, `tweet.write`, `users.read` scopes
+- **Twitter OAuth**: Hybrid - OAuth 2.0 for user auth & tweets, OAuth 1.0a for image uploads
 - **Mastodon OAuth**: OAuth 2.0 with `read write` scopes, instance-specific configuration
 - **Bluesky Authentication**: Secure app password system
 - **Token Management**: Automatic token storage, persistence, and refresh handling
@@ -182,7 +182,7 @@ The built files will be in the `dist` directory.
 1. Click the **⚙️ Settings** button in the top header
 2. Follow the platform-specific setup instructions:
    - **LinkedIn**: Get Client ID from LinkedIn Developer Portal
-   - **Twitter**: Get Client ID from Twitter Developer Portal  
+   - **Twitter**: Get OAuth 2.0 Client ID + OAuth 1.0a credentials from Twitter Developer Portal  
    - **Bluesky**: Generate app password in Bluesky settings
 3. Paste your credentials and they'll be automatically saved
 

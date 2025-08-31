@@ -2063,6 +2063,11 @@ function App() {
     
     const authData = auth.twitter;
     
+    // Note about hybrid authentication for images
+    if (imageFiles.length > 0) {
+      showNotification('📷 Uploading images to Twitter using OAuth 1.0a authentication...');
+    }
+    
     let response;
     if (imageFiles.length > 0) {
       // Use FormData for image upload
@@ -4310,7 +4315,19 @@ function App() {
                           <li>2. Create a new app or select existing one</li>
                           <li>3. In App Settings, add callback URL: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>http://localhost:3000</code></li>
                           <li>4. Enable scopes: <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>tweet.read tweet.write users.read</code></li>
-                          <li>5. Copy the Client ID and add it to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file as <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>TWITTER_CLIENT_ID</code></li>
+                          <li>5. Copy credentials from "Keys and tokens" tab to your <code className={`px-1 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>.env</code> file:</li>
+                        </ol>
+                        <div className={`mt-2 p-2 rounded text-xs ${darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+                          <div className="font-medium mb-1">For text tweets (OAuth 2.0):</div>
+                          <div className="font-mono">TWITTER_CLIENT_ID=your_client_id</div>
+                          <div className="font-mono">TWITTER_CLIENT_SECRET=your_client_secret</div>
+                          <div className="font-medium mb-1 mt-2">For image uploads (OAuth 1.0a):</div>
+                          <div className="font-mono">TWITTER_API_KEY=your_api_key</div>
+                          <div className="font-mono">TWITTER_API_SECRET=your_api_secret</div>
+                          <div className="font-mono">TWITTER_ACCESS_TOKEN=your_access_token</div>
+                          <div className="font-mono">TWITTER_ACCESS_TOKEN_SECRET=your_token_secret</div>
+                        </div>
+                        <ol className="text-xs space-y-1 mt-2" start={6}>
                           <li>6. Restart the server to load the new configuration</li>
                         </ol>
                       </div>
@@ -5403,7 +5420,14 @@ function App() {
           <div className={`text-sm mb-3 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
             {auth[selectedPlatform].isAuthenticated ? (
               <div className="flex items-center justify-between">
-                <span className="text-green-500">✅ Connected to {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}</span>
+                <div className="space-y-1">
+                  <span className="text-green-500">✅ Connected to {selectedPlatform === 'linkedin' ? 'LinkedIn' : selectedPlatform === 'twitter' ? 'X/Twitter' : selectedPlatform === 'mastodon' ? 'Mastodon' : 'Bluesky'}</span>
+                  {selectedPlatform === 'twitter' && (
+                    <div className={`text-xs p-2 rounded ${darkMode ? "bg-blue-900/30 text-blue-200" : "bg-blue-50 text-blue-700"}`}>
+                      📷 <strong>Image uploads:</strong> Requires OAuth 1.0a credentials in .env file (see Settings for details)
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-1">
                   <button
                     onClick={() => logout(selectedPlatform)}
