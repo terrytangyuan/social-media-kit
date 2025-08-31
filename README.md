@@ -313,6 +313,18 @@ We welcome contributions from developers of all skill levels! Whether you're fix
 
 📋 **For detailed guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)**
 
+## 🙏 Acknowledgements
+
+This project was developed with the assistance of AI Code Assistant tools, which helped with:
+
+- **Code Architecture & Implementation**: Structuring the multi-platform authentication system and API integrations
+- **Problem Solving**: Debugging complex OAuth flows, token refresh mechanisms, and cross-platform compatibility issues  
+- **Documentation**: Creating comprehensive setup guides, API documentation, and troubleshooting resources
+- **Testing & Quality Assurance**: Implementing robust error handling, input validation, and automated testing
+- **User Experience**: Designing intuitive interfaces and optimizing the posting workflow across platforms
+
+We acknowledge the valuable role of AI assistance in accelerating development while maintaining code quality and best practices. The project combines human creativity and decision-making with AI-powered coding assistance to deliver a robust social media management tool.
+
 ---
 
 **Made with ❤️ for better social media content creation and cross-platform posting**
