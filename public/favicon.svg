@@ -1,23 +1,34 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background circle -->
-  <circle cx="16" cy="16" r="15" fill="#3B82F6" stroke="#1E40AF" stroke-width="2"/>
+  <!-- Transparent background for better dark mode compatibility -->
   
-  <!-- Social media icons representation -->
-  <!-- Share/network symbol -->
-  <g fill="white">
-    <!-- Central node -->
-    <circle cx="16" cy="16" r="2.5"/>
+  <!-- Social media network symbol with contrasting colors -->
+  <g>
+    <!-- Central hub with white fill and dark border -->
+    <circle cx="16" cy="16" r="2.5" fill="#3B82F6" stroke="#1E40AF" stroke-width="1"/>
     
     <!-- Connected nodes -->
-    <circle cx="8" cy="10" r="1.8"/>
-    <circle cx="24" cy="10" r="1.8"/>
-    <circle cx="8" cy="22" r="1.8"/>
-    <circle cx="24" cy="22" r="1.8"/>
+    <circle cx="8" cy="10" r="1.8" fill="#3B82F6" stroke="#1E40AF" stroke-width="1"/>
+    <circle cx="24" cy="10" r="1.8" fill="#3B82F6" stroke="#1E40AF" stroke-width="1"/>
+    <circle cx="8" cy="22" r="1.8" fill="#3B82F6" stroke="#1E40AF" stroke-width="1"/>
+    <circle cx="24" cy="22" r="1.8" fill="#3B82F6" stroke="#1E40AF" stroke-width="1"/>
     
-    <!-- Connection lines -->
-    <line x1="13.5" y1="14.5" x2="9.8" y2="11.8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="18.5" y1="14.5" x2="22.2" y2="11.8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="13.5" y1="17.5" x2="9.8" y2="20.2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="18.5" y1="17.5" x2="22.2" y2="20.2" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Connection lines with strong contrast -->
+    <line x1="13.5" y1="14.5" x2="9.8" y2="11.8" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18.5" y1="14.5" x2="22.2" y2="11.8" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="13.5" y1="17.5" x2="9.8" y2="20.2" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18.5" y1="17.5" x2="22.2" y2="20.2" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Add subtle white outline for dark backgrounds -->
+    <g stroke="white" stroke-width="0.5" fill="none" opacity="0.3">
+      <circle cx="16" cy="16" r="2.5"/>
+      <circle cx="8" cy="10" r="1.8"/>
+      <circle cx="24" cy="10" r="1.8"/>
+      <circle cx="8" cy="22" r="1.8"/>
+      <circle cx="24" cy="22" r="1.8"/>
+      <line x1="13.5" y1="14.5" x2="9.8" y2="11.8" stroke-linecap="round"/>
+      <line x1="18.5" y1="14.5" x2="22.2" y2="11.8" stroke-linecap="round"/>
+      <line x1="13.5" y1="17.5" x2="9.8" y2="20.2" stroke-linecap="round"/>
+      <line x1="18.5" y1="17.5" x2="22.2" y2="20.2" stroke-linecap="round"/>
+    </g>
   </g>
 </svg>
