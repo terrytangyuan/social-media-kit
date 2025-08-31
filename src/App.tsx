@@ -345,7 +345,7 @@ function App() {
   });
   const [modalAutoPostEnabled, setModalAutoPostEnabled] = useState(false);
   const [modalAutoPostPlatforms, setModalAutoPostPlatforms] = useState<('linkedin' | 'twitter' | 'mastodon' | 'bluesky')[]>([]);
-  const [modalNotificationEnabled, setModalNotificationEnabled] = useState(true);
+  const [modalNotificationEnabled, setModalNotificationEnabled] = useState(false);
   const [selectedLogoutPlatforms, setSelectedLogoutPlatforms] = useState<string[]>([]);
   
   // Auto-sync state
@@ -2668,12 +2668,36 @@ function App() {
       // Add to published posts
       const currentPost = posts.find(p => p.id === currentPostId);
       if (currentPost) {
+        // Extract post information for tracking
+        let postId = '';
+        let postUrl = '';
+        
+        if (selectedPlatform === 'twitter' && results[0]?.data?.data?.id) {
+          postId = results[0].data.data.id;
+          postUrl = `https://twitter.com/i/status/${postId}`;
+        } else if (selectedPlatform === 'linkedin' && results[0]?.data?.id) {
+          postId = results[0].data.id;
+          // LinkedIn post URLs are more complex, so we'll just track the ID
+        } else if (selectedPlatform === 'bluesky' && results[0]?.uri) {
+          postId = results[0].uri;
+          // Extract rkey from URI and construct Bluesky URL
+          const uriParts = results[0].uri.split('/');
+          const rkey = uriParts[uriParts.length - 1];
+          const blueskyHandle = auth.bluesky.handle;
+          if (blueskyHandle && rkey) {
+            postUrl = `https://bsky.app/profile/${blueskyHandle}/post/${rkey}`;
+          }
+        } else if (selectedPlatform === 'mastodon' && results[0]?.data?.id) {
+          postId = results[0].data.id;
+          postUrl = results[0].data.url || '';
+        }
+
         const platformResult: PlatformPostResult = {
           platform: selectedPlatform,
           success: true,
-          postId: results[0]?.data?.id || results[0]?.data?.data?.id || results[0]?.id || 'unknown',
+          postId: postId || 'unknown',
           publishedAt: new Date().toISOString(),
-          postUrl: results[0]?.data?.url || results[0]?.data?.data?.url || results[0]?.url || undefined
+          postUrl: postUrl || undefined
         };
         
 
@@ -3509,10 +3533,35 @@ function App() {
             }
           }
           
+          // Extract post information for tracking
+          let postId = '';
+          let postUrl = '';
+          
+          if (platform === 'twitter' && firstResult?.data?.data?.id) {
+            postId = firstResult.data.data.id;
+            postUrl = `https://twitter.com/i/status/${postId}`;
+          } else if (platform === 'linkedin' && firstResult?.data?.id) {
+            postId = firstResult.data.id;
+            // LinkedIn post URLs are more complex, so we'll just track the ID
+          } else if (platform === 'bluesky' && firstResult?.uri) {
+            postId = firstResult.uri;
+            // Extract rkey from URI and construct Bluesky URL
+            const uriParts = firstResult.uri.split('/');
+            const rkey = uriParts[uriParts.length - 1];
+            const blueskyHandle = auth.bluesky.handle;
+            if (blueskyHandle && rkey) {
+              postUrl = `https://bsky.app/profile/${blueskyHandle}/post/${rkey}`;
+            }
+          } else if (platform === 'mastodon' && firstResult?.data?.id) {
+            postId = firstResult.data.id;
+            postUrl = firstResult.data.url || '';
+          }
+
           platformResults.push({
             platform,
             success: true,
-            postId: firstResult?.data?.id || firstResult?.id || firstResult?.uri,
+            postId: postId || 'unknown',
+            postUrl: postUrl || undefined,
             publishedAt: new Date().toISOString()
           });
           
@@ -3655,7 +3704,7 @@ function App() {
     setModalTimezone(timezone);
     setModalAutoPostEnabled(autoPostEnabled);
     setModalAutoPostPlatforms([...autoPostPlatforms]);
-    setModalNotificationEnabled(true);
+    setModalNotificationEnabled(false);
     setShowScheduleModal(true);
   };
 
@@ -5482,23 +5531,8 @@ function App() {
         </div>
 
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Schedule Post
-          </label>
-            <button
-              onClick={openScheduleModal}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                darkMode 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              📅 Schedule Post
-            </button>
-          </div>
           
-          {scheduleTime && (
+          {scheduleTime && new Date(scheduleTime) > new Date() && (
             <div className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
               <div className="flex items-center justify-between">
                 <div>
@@ -5552,25 +5586,38 @@ function App() {
             </button>
           )}
           
-          {/* Post to All button */}
-          {(() => {
-            const connectedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
-              platform => auth[platform].isAuthenticated
-            );
-            
-            if (connectedPlatforms.length > 1) {
-              return (
-                <button 
-                  onClick={handlePostToAll}
-                  disabled={isPosting}
-                  className={`${isPosting ? 'bg-gray-500' : 'bg-purple-600 hover:bg-purple-700'} text-white px-4 py-2 rounded-xl flex items-center gap-2`}
-                >
-                  {isPosting ? '⏳' : '🚀'} {isPosting ? 'Posting...' : `Post to All (${connectedPlatforms.length})`}
-                </button>
+          {/* Post to All and Schedule Post buttons */}
+          <div className="flex gap-3 justify-end">
+            {(() => {
+              const connectedPlatforms = (['linkedin', 'twitter', 'mastodon', 'bluesky'] as const).filter(
+                platform => auth[platform].isAuthenticated
               );
-            }
-            return null;
-          })()}
+              
+              if (connectedPlatforms.length > 1) {
+                return (
+                  <button 
+                    onClick={handlePostToAll}
+                    disabled={isPosting}
+                    className={`${isPosting ? 'bg-gray-500' : 'bg-purple-600 hover:bg-purple-700'} text-white px-4 py-2 rounded-xl flex items-center gap-2`}
+                  >
+                    {isPosting ? '⏳' : '🚀'} {isPosting ? 'Posting...' : `Post to All (${connectedPlatforms.length})`}
+                  </button>
+                );
+              }
+              return null;
+            })()}
+            
+            <button
+              onClick={openScheduleModal}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                darkMode 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+            >
+              📅 Schedule Post
+            </button>
+          </div>
 
         </div>
           </>
