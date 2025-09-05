@@ -274,6 +274,7 @@ function App() {
     scheduleTime: string;
     timezone: string;
     createdAt: string;
+    isScheduled?: boolean; // Flag to indicate if post is actually scheduled
     images?: {
       file: File;
       dataUrl: string;
@@ -1244,7 +1245,7 @@ function App() {
 
 
 
-  const saveCurrentPost = () => {
+  const saveCurrentPost = (markAsScheduled = false, unschedule = false) => {
     if (!currentPostId) {
       createNewPost();
       return;
@@ -1260,6 +1261,7 @@ function App() {
             content: text, 
             scheduleTime, 
             timezone,
+            isScheduled: unschedule ? undefined : (markAsScheduled || post.isScheduled), // Clear, set, or keep existing scheduled status
             images: attachedImages.length > 0 ? attachedImages : undefined,
             platformImageSelections: Object.keys(platformImageSelections).length > 0 ? platformImageSelections : undefined,
             autoPost: autoPostEnabled && validAutoPostPlatforms.length > 0 ? {
@@ -1269,6 +1271,11 @@ function App() {
           }
         : post
     ));
+  };
+
+  // Helper function to unschedule a post
+  const unschedulePost = () => {
+    saveCurrentPost(false, true);
   };
 
   const switchToPost = (postId: string) => {
@@ -3740,8 +3747,8 @@ function App() {
     setAutoPostEnabled(modalAutoPostEnabled);
     setAutoPostPlatforms([...modalAutoPostPlatforms]);
     
-    // Save the current post with new schedule settings
-    saveCurrentPost();
+    // Save the current post with new schedule settings and mark as scheduled
+    saveCurrentPost(true);
     
     // Close modal
     setShowScheduleModal(false);
@@ -3790,7 +3797,8 @@ function App() {
       const now = new Date();
       
       posts.forEach((post) => {
-        if (!post.scheduleTime) return;
+        // Only process posts that are explicitly scheduled or have auto-posting enabled
+        if (!post.scheduleTime || (!post.isScheduled && !post.autoPost?.enabled)) return;
         
         // Skip if already executed or currently executing
         if (executedPosts.has(post.id) || scheduledPostsStatus[post.id] === 'executing' || scheduledPostsStatus[post.id] === 'completed') {
