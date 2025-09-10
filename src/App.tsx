@@ -88,8 +88,8 @@ const TagAutocomplete = ({ suggestions, onSelect, onClose, position, darkMode, f
           : "bg-white border-gray-300 text-gray-800"
       }`}
       style={{
-        top: position.top,
-        left: position.left,
+        top: `${position.top}px`,
+        left: `${position.left}px`,
       }}
       ref={listRef}
     >
@@ -4112,8 +4112,6 @@ function App() {
         // Calculate position for the dropdown
         const textarea = textareaRef.current;
         if (textarea) {
-          const rect = textarea.getBoundingClientRect();
-          
           // Create a temporary element to measure text dimensions more accurately
           const measureElement = document.createElement('div');
           measureElement.style.position = 'absolute';
@@ -4124,11 +4122,12 @@ function App() {
           measureElement.style.margin = '0';
           measureElement.style.border = 'none';
           
-          const textBeforeCursor = text.substring(0, cursorPos);
-          const lines = textBeforeCursor.split('\n');
-          const currentLineText = lines[lines.length - 1];
+          // Calculate text width only up to the @ symbol position
+          const textBeforeAt = text.substring(0, atPos);
+          const linesBeforeAt = textBeforeAt.split('\n');
+          const currentLineTextBeforeAt = linesBeforeAt[linesBeforeAt.length - 1];
           
-          measureElement.textContent = currentLineText;
+          measureElement.textContent = currentLineTextBeforeAt;
           document.body.appendChild(measureElement);
           
           const textWidth = measureElement.offsetWidth;
@@ -4136,12 +4135,13 @@ function App() {
           
           document.body.removeChild(measureElement);
           
-          // Calculate position relative to textarea
+          // Calculate position relative to textarea (not viewport)
           const paddingLeft = parseFloat(window.getComputedStyle(textarea).paddingLeft) || 16;
           const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop) || 16;
           
-          const top = rect.top + paddingTop + (lines.length - 1) * lineHeight + lineHeight + window.scrollY;
-          const left = rect.left + paddingLeft + textWidth + window.scrollX;
+          // Position relative to the textarea element, not the viewport
+          const top = paddingTop + (linesBeforeAt.length - 1) * lineHeight + lineHeight;
+          const left = paddingLeft + textWidth;
           
           setTagAutocompletePosition({ top, left });
           setShowTagAutocomplete(true);
