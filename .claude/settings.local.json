@@ -16,7 +16,9 @@
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm audit fix:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

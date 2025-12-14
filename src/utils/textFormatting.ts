@@ -1,4 +1,5 @@
 // Text formatting utilities for social media posts
+import GraphemeSplitter from 'grapheme-splitter';
 
 // Unicode character mappings
 const boldMap: { [key: string]: string } = {
@@ -124,9 +125,6 @@ export const countCharactersForBluesky = (text: string): number => {
   // Use grapheme-splitter for accurate AT Protocol-compatible counting
   // This is what Bluesky's backend uses
   try {
-    // Dynamic import for grapheme-splitter
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const GraphemeSplitter = require('grapheme-splitter');
     const splitter = new GraphemeSplitter();
     return splitter.countGraphemes(formatted);
   } catch {
