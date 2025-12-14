@@ -406,6 +406,10 @@ function App() {
   const [selectedPublishedPost, setSelectedPublishedPost] = useState<PublishedPost | null>(null);
   const [selectedDeletedPost, setSelectedDeletedPost] = useState<DeletedPost | null>(null);
 
+  // Bulk selection for posts
+  const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
+  const lastClickedIndexRef = useRef<number | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoTimeoutRef = useRef<number>();
 
@@ -1320,7 +1324,7 @@ function App() {
     if (postToDelete) {
       addDeletedPost(postToDelete, 'user_deleted');
     }
-    
+
     setPosts(prev => prev.filter(p => p.id !== postId));
     if (currentPostId === postId) {
       const remainingPosts = posts.filter(p => p.id !== postId);
@@ -1331,6 +1335,82 @@ function App() {
         setText("");
         setScheduleTime("");
       }
+    }
+  };
+
+  const togglePostSelection = (postId: string, index: number, shiftKey: boolean = false) => {
+    if (shiftKey && lastClickedIndexRef.current !== null) {
+      // Shift-click: select range
+      const start = Math.min(lastClickedIndexRef.current, index);
+      const end = Math.max(lastClickedIndexRef.current, index);
+
+      setSelectedPostIds(prev => {
+        const newSet = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          if (posts[i]) {
+            newSet.add(posts[i].id);
+          }
+        }
+        return newSet;
+      });
+    } else {
+      // Normal click: toggle single item
+      setSelectedPostIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(postId)) {
+          newSet.delete(postId);
+        } else {
+          newSet.add(postId);
+        }
+        return newSet;
+      });
+    }
+
+    // Update last clicked index
+    lastClickedIndexRef.current = index;
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPostIds.size === posts.length) {
+      setSelectedPostIds(new Set());
+    } else {
+      setSelectedPostIds(new Set(posts.map(p => p.id)));
+    }
+    // Reset last clicked index when using select all
+    lastClickedIndexRef.current = null;
+  };
+
+  const deleteSelectedPosts = () => {
+    if (selectedPostIds.size === 0) return;
+
+    const count = selectedPostIds.size;
+    if (confirm(`Delete ${count} selected post${count > 1 ? 's' : ''}?`)) {
+      // Track all deleted posts
+      selectedPostIds.forEach(postId => {
+        const postToDelete = posts.find(p => p.id === postId);
+        if (postToDelete) {
+          addDeletedPost(postToDelete, 'user_deleted');
+        }
+      });
+
+      // Remove posts
+      setPosts(prev => prev.filter(p => !selectedPostIds.has(p.id)));
+
+      // Handle current post
+      if (currentPostId && selectedPostIds.has(currentPostId)) {
+        const remainingPosts = posts.filter(p => !selectedPostIds.has(p.id));
+        if (remainingPosts.length > 0) {
+          switchToPost(remainingPosts[0].id);
+        } else {
+          setCurrentPostId(null);
+          setText("");
+          setScheduleTime("");
+        }
+      }
+
+      // Clear selection and reset last clicked index
+      setSelectedPostIds(new Set());
+      lastClickedIndexRef.current = null;
     }
   };
 
@@ -4697,25 +4777,65 @@ function App() {
                 </div>
               </div>
             </div>
-            
+
             {posts.length === 0 ? (
               <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                 No posts yet. Click "New Post" to create your first post.
               </p>
             ) : (
-              <div className="space-y-2">
-                {posts.map((post) => (
+              <>
+                {/* Bulk selection controls */}
+                {posts.length > 0 && (
+                  <div className={`flex items-center justify-between mb-3 p-2 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedPostIds.size === posts.length && posts.length > 0}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                        <span className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                          Select All ({selectedPostIds.size}/{posts.length})
+                        </span>
+                      </label>
+                    </div>
+                    {selectedPostIds.size > 0 && (
+                      <button
+                        onClick={deleteSelectedPosts}
+                        className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                      >
+                        🗑️ Delete Selected ({selectedPostIds.size})
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                {posts.map((post, index) => (
                   <div
                     key={post.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      currentPostId === post.id 
+                    className={`p-3 border rounded-lg transition-colors ${
+                      currentPostId === post.id
                         ? (darkMode ? "bg-blue-800 border-blue-600" : "bg-blue-100 border-blue-400")
                         : (darkMode ? "bg-gray-800 border-gray-600 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-gray-50")
                     }`}
-                    onClick={() => switchToPost(post.id)}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                      <div className="flex items-start gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedPostIds.has(post.id)}
+                          onChange={() => {
+                            // State change handled in onClick
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePostSelection(post.id, index, e.shiftKey);
+                          }}
+                          className="w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                        />
+                        <div className="flex-1 cursor-pointer" onClick={() => switchToPost(post.id)}>
                         <input
                           type="text"
                           value={post.title}
@@ -4761,6 +4881,7 @@ function App() {
                             📷 {post.images.length} image{post.images.length > 1 ? 's' : ''}
                           </p>
                         )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 ml-3">
                         {currentPostId === post.id && (
@@ -4784,7 +4905,8 @@ function App() {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
             
 
