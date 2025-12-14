@@ -410,6 +410,10 @@ function App() {
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
   const lastClickedIndexRef = useRef<number | null>(null);
 
+  // Bulk selection for deleted posts
+  const [selectedDeletedPostIds, setSelectedDeletedPostIds] = useState<Set<string>>(new Set());
+  const lastClickedDeletedIndexRef = useRef<number | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoTimeoutRef = useRef<number>();
 
@@ -2671,6 +2675,61 @@ function App() {
   const permanentlyDeletePost = (deletedPostId: string) => {
     if (confirm('Are you sure you want to permanently delete this post? This action cannot be undone.')) {
       setDeletedPosts(prev => prev.filter(p => p.id !== deletedPostId));
+    }
+  };
+
+  const toggleDeletedPostSelection = (postId: string, index: number, shiftKey: boolean = false) => {
+    if (shiftKey && lastClickedDeletedIndexRef.current !== null) {
+      // Shift-click: select range
+      const actualDeletedPosts = getActualDeletedPosts();
+      const start = Math.min(lastClickedDeletedIndexRef.current, index);
+      const end = Math.max(lastClickedDeletedIndexRef.current, index);
+
+      setSelectedDeletedPostIds(prev => {
+        const newSet = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          if (actualDeletedPosts[i]) {
+            newSet.add(actualDeletedPosts[i].id);
+          }
+        }
+        return newSet;
+      });
+    } else {
+      // Normal click: toggle single item
+      setSelectedDeletedPostIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(postId)) {
+          newSet.delete(postId);
+        } else {
+          newSet.add(postId);
+        }
+        return newSet;
+      });
+    }
+
+    // Update last clicked index
+    lastClickedDeletedIndexRef.current = index;
+  };
+
+  const toggleSelectAllDeletedPosts = () => {
+    const actualDeletedPosts = getActualDeletedPosts();
+    if (selectedDeletedPostIds.size === actualDeletedPosts.length) {
+      setSelectedDeletedPostIds(new Set());
+    } else {
+      setSelectedDeletedPostIds(new Set(actualDeletedPosts.map(p => p.id)));
+    }
+    // Reset last clicked index when using select all
+    lastClickedDeletedIndexRef.current = null;
+  };
+
+  const permanentlyDeleteSelectedPosts = () => {
+    if (selectedDeletedPostIds.size === 0) return;
+
+    const count = selectedDeletedPostIds.size;
+    if (confirm(`Are you sure you want to permanently delete ${count} selected post${count > 1 ? 's' : ''}? This action cannot be undone.`)) {
+      setDeletedPosts(prev => prev.filter(p => !selectedDeletedPostIds.has(p.id)));
+      setSelectedDeletedPostIds(new Set());
+      lastClickedDeletedIndexRef.current = null;
     }
   };
 
@@ -5019,12 +5078,54 @@ function App() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {getActualDeletedPosts().map((post) => (
+                  <>
+                    {/* Bulk selection controls */}
+                    {getActualDeletedPosts().length > 0 && (
+                      <div className={`flex items-center justify-between mb-3 p-2 rounded-lg ${darkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedDeletedPostIds.size === getActualDeletedPosts().length && getActualDeletedPosts().length > 0}
+                              onChange={toggleSelectAllDeletedPosts}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                            <span className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                              Select All ({selectedDeletedPostIds.size}/{getActualDeletedPosts().length})
+                            </span>
+                          </label>
+                        </div>
+                        {selectedDeletedPostIds.size > 0 && (
+                          <button
+                            onClick={permanentlyDeleteSelectedPosts}
+                            className={`text-sm px-3 py-1 rounded-lg ${darkMode ? "bg-red-600 hover:bg-red-700 text-white" : "bg-red-500 hover:bg-red-600 text-white"}`}
+                          >
+                            🗑️ Delete Forever ({selectedDeletedPostIds.size})
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                    {getActualDeletedPosts().map((post, index) => (
                       <div key={post.id} className={`p-4 border rounded-lg ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold text-lg">{post.title}</h3>
-                          <div className="flex gap-2">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedDeletedPostIds.has(post.id)}
+                            onChange={() => {
+                              // State change handled in onClick
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleDeletedPostSelection(post.id, index, e.shiftKey);
+                            }}
+                            className="w-4 h-4 mt-1 cursor-pointer flex-shrink-0"
+                          />
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-semibold text-lg">{post.title}</h3>
+                              <div className="flex gap-2">
                             <span className={`text-xs px-2 py-1 rounded ${darkMode ? "bg-red-600" : "bg-red-100 text-red-800"}`}>
                               Deleted
                             </span>
@@ -5065,9 +5166,12 @@ function App() {
                             </button>
                           </div>
                         </div>
+                          </div>
+                        </div>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
