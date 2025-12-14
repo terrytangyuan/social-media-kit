@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   formatText,
   countCharacters,
+  countCharactersForBluesky,
   countWords,
   hasFormatting,
   removeFormatting,
@@ -89,6 +90,29 @@ describe('Text Formatting Utilities', () => {
       expect(countCharacters('Hello @_user_ world')).toBe(19); // Fixed: underscores preserved
       expect(countCharacters('Text with _italic_ and @_user_')).toBe(28); // Fixed: 'italic' (6) + other text (22)
     });
+
+    it('should count Unicode bold characters correctly', () => {
+      // '𝗛𝗲𝗹𝗹𝗼' is 'Hello' in Unicode bold
+      expect(countCharacters('𝗛𝗲𝗹𝗹𝗼')).toBe(5);
+      expect(countCharacters('𝗛𝗲𝗹𝗹𝗼 𝗪𝗼𝗿𝗹𝗱')).toBe(11); // 'Hello World'
+      expect(countCharacters('𝟭𝟮𝟯')).toBe(3); // '123' in Unicode bold
+    });
+
+    it('should count Unicode italic characters correctly', () => {
+      // '𝘏𝘦𝘭𝘭𝘰' is 'Hello' in Unicode italic
+      expect(countCharacters('𝘏𝘦𝘭𝘭𝘰')).toBe(5);
+      expect(countCharacters('𝘛𝘦𝘴𝘵')).toBe(4); // 'Test' in Unicode italic
+    });
+
+    it('should count mixed Unicode bold and italic correctly', () => {
+      // '𝗕𝗼𝗹𝗱 and 𝘪𝘵𝘢𝘭𝘪𝘤 text' = 'Bold and italic text' = 20 chars
+      expect(countCharacters('𝗕𝗼𝗹𝗱 and 𝘪𝘵𝘢𝘭𝘪𝘤 text')).toBe(20);
+    });
+
+    it('should count mixed plain and Unicode formatted text correctly', () => {
+      expect(countCharacters('Plain 𝗯𝗼𝗹𝗱 text')).toBe(15);
+      expect(countCharacters('Text with 𝘪𝘵𝘢𝘭𝘪𝘤 parts')).toBe(22);
+    });
   });
 
   describe('countWords', () => {
@@ -106,6 +130,86 @@ describe('Text Formatting Utilities', () => {
 
     it('should handle extra whitespace', () => {
       expect(countWords('  One   two  ')).toBe(2);
+    });
+
+    it('should count words in Unicode bold text correctly', () => {
+      // '𝗛𝗲𝗹𝗹𝗼 𝗪𝗼𝗿𝗹𝗱' is 'Hello World' in Unicode bold
+      expect(countWords('𝗛𝗲𝗹𝗹𝗼 𝗪𝗼𝗿𝗹𝗱')).toBe(2);
+      expect(countWords('𝗧𝗵𝗶𝘀 𝗶𝘀 𝗯𝗼𝗹𝗱')).toBe(3); // 'This is bold'
+    });
+
+    it('should count words in Unicode italic text correctly', () => {
+      // '𝘏𝘦𝘭𝘭𝘰 𝘞𝘰𝘳𝘭𝘥' is 'Hello World' in Unicode italic
+      expect(countWords('𝘏𝘦𝘭𝘭𝘰 𝘞𝘰𝘳𝘭𝘥')).toBe(2);
+      expect(countWords('𝘛𝘦𝘴𝘵 𝘴𝘵𝘳𝘪𝘯𝘨')).toBe(2); // 'Test string'
+    });
+
+    it('should count words in mixed Unicode and plain text correctly', () => {
+      // '𝗕𝗼𝗹𝗱 and 𝘪𝘵𝘢𝘭𝘪𝘤 text'
+      expect(countWords('𝗕𝗼𝗹𝗱 and 𝘪𝘵𝘢𝘭𝘪𝘤 text')).toBe(4);
+      expect(countWords('Plain 𝗯𝗼𝗹𝗱 and 𝘪𝘵𝘢𝘭𝘪𝘤 words')).toBe(5);
+    });
+
+    it('should count words with Unicode formatted text matching unformatted count', () => {
+      // These should have the same word count despite formatting
+      expect(countWords('Hello World')).toBe(countWords('𝗛𝗲𝗹𝗹𝗼 𝗪𝗼𝗿𝗹𝗱'));
+      expect(countWords('Test string')).toBe(countWords('𝘛𝘦𝘴𝘵 𝘴𝘵𝘳𝘪𝘯𝘨'));
+    });
+  });
+
+  describe('countCharactersForBluesky', () => {
+    it('should count formatted text (what Bluesky sees)', () => {
+      // Plain text should count normally
+      expect(countCharactersForBluesky('Hello World')).toBe(11);
+    });
+
+    it('should count bold formatted text with Unicode characters', () => {
+      // **Hello** becomes 𝗛𝗲𝗹𝗹𝗼 (5 Unicode characters)
+      expect(countCharactersForBluesky('**Hello**')).toBe(5);
+      // The formatted version should count the same as graphemes (not UTF-16 length)
+      expect(countCharactersForBluesky('**Hello**')).toBe(Array.from(formatText('**Hello**')).length);
+    });
+
+    it('should count italic formatted text with Unicode characters', () => {
+      // _World_ becomes 𝘞𝘰𝘳𝘭𝘥 (5 Unicode characters)
+      expect(countCharactersForBluesky('_World_')).toBe(5);
+    });
+
+    it('should count mixed bold and italic text', () => {
+      // **Bold** and _italic_ text
+      const text = '**Bold** and _italic_ text';
+      const formatted = formatText(text);
+      expect(countCharactersForBluesky(text)).toBe(Array.from(formatted).length);
+    });
+
+    it('should count the example text correctly for Bluesky', () => {
+      const text = `🎤 **More slides are available**!
+
+At #KubeCon North America 2025 in Atlanta, I had the pleasure of joining Stephen Rust, Rajas Kakodkar, and Alex Scammon for our session: _Introducing TAG Workloads Foundation: Advancing the Core`;
+
+      // This should be around 224-225 characters (what Bluesky will see after formatting)
+      const blueskyCount = countCharactersForBluesky(text);
+      expect(blueskyCount).toBeGreaterThan(220);
+      expect(blueskyCount).toBeLessThan(230);
+    });
+
+    it('should count more than countCharacters for formatted text', () => {
+      // countCharacters removes formatting markers
+      // countCharactersForBluesky keeps the Unicode formatted characters
+      // So for text with formatting, Bluesky count should be >= regular count
+      const text = '**Hello** _World_';
+      const regularCount = countCharacters(text);
+      const blueskyCount = countCharactersForBluesky(text);
+
+      // Regular removes markers: "Hello World" = 11 chars
+      expect(regularCount).toBe(11);
+      // Bluesky uses formatted: "𝗛𝗲𝗹𝗹𝗼 𝘞𝘰𝘳𝘭𝘥" = 11 chars (same in this case)
+      expect(blueskyCount).toBe(11);
+    });
+
+    it('should preserve @ mentions and hashtags', () => {
+      const text = 'Hello @user and #hashtag';
+      expect(countCharactersForBluesky(text)).toBe(24);
     });
   });
 

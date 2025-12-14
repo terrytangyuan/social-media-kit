@@ -4,7 +4,17 @@
       "Bash(mkdir:*)",
       "Bash(npm run type-check:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm test:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm install grapheme-splitter)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

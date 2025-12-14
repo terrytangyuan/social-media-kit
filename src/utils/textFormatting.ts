@@ -20,17 +20,47 @@ const italicMap: { [key: string]: string } = {
   'U': '𝘜', 'V': '𝘝', 'W': '𝘞', 'X': '𝘟', 'Y': '𝘠', 'Z': '𝘡'
 };
 
+// Create reverse mappings for converting Unicode characters back to normal text
+const boldReverseMap: { [key: string]: string } = {};
+Object.entries(boldMap).forEach(([normal, bold]) => {
+  boldReverseMap[bold] = normal;
+});
+
+const italicReverseMap: { [key: string]: string } = {};
+Object.entries(italicMap).forEach(([normal, italic]) => {
+  italicReverseMap[italic] = normal;
+});
+
+/**
+ * Normalize Unicode formatted text back to regular characters
+ * This is used for accurate word and character counting
+ */
+const normalizeUnicodeFormatting = (text: string): string => {
+  // Use Array.from to properly handle surrogate pairs (Unicode characters outside BMP)
+  return Array.from(text).map(char => {
+    // Convert bold Unicode back to normal
+    if (boldReverseMap[char]) {
+      return boldReverseMap[char];
+    }
+    // Convert italic Unicode back to normal
+    if (italicReverseMap[char]) {
+      return italicReverseMap[char];
+    }
+    return char;
+  }).join('');
+};
+
 /**
  * Convert text with **bold** and _italic_ formatting to Unicode characters
  */
 export const formatText = (input: string): string => {
   let result = input;
-  
+
   // Convert **text** to Unicode bold
   result = result.replace(/\*\*(.*?)\*\*/g, (match, text) => {
-    return text.split('').map((char: string) => boldMap[char] || char).join('');
+    return Array.from(text).map((char: string) => boldMap[char] || char).join('');
   });
-  
+
   // Convert _text_ to Unicode italic, but not when part of @ mentions
   // First, temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
@@ -39,17 +69,17 @@ export const formatText = (input: string): string => {
     mentionPlaceholders.push(match);
     return placeholder;
   });
-  
+
   // Now convert _text_ to italic without worrying about @ mentions
   result = result.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, (match, text) => {
-    return text.split('').map((char: string) => italicMap[char] || char).join('');
+    return Array.from(text).map((char: string) => italicMap[char] || char).join('');
   });
-  
+
   // Restore the @ mentions
   mentionPlaceholders.forEach((mention, index) => {
     result = result.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
   });
-  
+
   return result;
 };
 
@@ -57,9 +87,12 @@ export const formatText = (input: string): string => {
  * Count characters in text (excluding formatting)
  */
 export const countCharacters = (text: string): number => {
+  // First normalize any Unicode formatted characters back to normal
+  let cleanText = normalizeUnicodeFormatting(text);
+
   // Remove formatting markers before counting
-  let cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1');
-  
+  cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '$1');
+
   // Temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
   cleanText = cleanText.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
@@ -67,25 +100,51 @@ export const countCharacters = (text: string): number => {
     mentionPlaceholders.push(match);
     return placeholder;
   });
-  
+
   // Remove italic formatting
   cleanText = cleanText.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, '$1');
-  
+
   // Restore the @ mentions
   mentionPlaceholders.forEach((mention, index) => {
     cleanText = cleanText.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
   });
-  
+
   return cleanText.length;
+};
+
+/**
+ * Count characters for Bluesky (counts formatted Unicode text as Bluesky sees it)
+ * Bluesky counts graphemes in the formatted text using grapheme-splitter library
+ * which matches AT Protocol's character counting
+ */
+export const countCharactersForBluesky = (text: string): number => {
+  // Format the text first (convert **bold** and _italic_ to Unicode)
+  const formatted = formatText(text);
+
+  // Use grapheme-splitter for accurate AT Protocol-compatible counting
+  // This is what Bluesky's backend uses
+  try {
+    // Dynamic import for grapheme-splitter
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const GraphemeSplitter = require('grapheme-splitter');
+    const splitter = new GraphemeSplitter();
+    return splitter.countGraphemes(formatted);
+  } catch {
+    // Fallback to Array.from if grapheme-splitter is not available
+    return Array.from(formatted).length;
+  }
 };
 
 /**
  * Count words in text (excluding formatting)
  */
 export const countWords = (text: string): number => {
+  // First normalize any Unicode formatted characters back to normal
+  let cleanText = normalizeUnicodeFormatting(text);
+
   // Remove formatting markers before counting
-  let cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1');
-  
+  cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '$1');
+
   // Temporarily replace @ mentions to protect them (including those with underscores)
   const mentionPlaceholders: string[] = [];
   cleanText = cleanText.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
@@ -93,15 +152,15 @@ export const countWords = (text: string): number => {
     mentionPlaceholders.push(match);
     return placeholder;
   });
-  
+
   // Remove italic formatting
   cleanText = cleanText.replace(/(?<!\\)_([^_\s][^_]*[^_\s]|[^_\s])_/g, '$1');
-  
+
   // Restore the @ mentions
   mentionPlaceholders.forEach((mention, index) => {
     cleanText = cleanText.replace(`MENTIONPLACEHOLDER${index}PLACEHOLDER`, mention);
   });
-  
+
   return cleanText.trim().split(/\s+/).filter(word => word.length > 0).length;
 };
 
