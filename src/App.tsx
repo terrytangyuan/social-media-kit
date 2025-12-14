@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import GraphemeSplitter from "grapheme-splitter";
 import { countWords, countCharacters, countCharactersForBluesky } from "./utils/textFormatting";
 
 // Tag Autocomplete Component
@@ -3032,8 +3033,6 @@ function App() {
     if (platform === 'bluesky') {
       // Use grapheme-splitter for Bluesky (matches what Bluesky sees)
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const GraphemeSplitter = require('grapheme-splitter');
         const splitter = new GraphemeSplitter();
         return splitter.countGraphemes(text);
       } catch {
@@ -3061,7 +3060,7 @@ function App() {
       }
 
       // Find the best break point within the limit
-      const breakPoint = findBestBreakPoint(remainingText, limit);
+      const breakPoint = findBestBreakPoint(remainingText, limit, platform);
 
       // Extract chunk and clean up
       let chunk = remainingText.substring(0, breakPoint).replace(/\s+$/, ''); // Remove trailing whitespace
@@ -3097,34 +3096,99 @@ function App() {
   };
 
   // Helper function to find the best break point within the character limit
-  const findBestBreakPoint = (text: string, limit: number): number => {
-    // Look for sentence endings first (priority)
-    const sentenceMarkers = ['. ', '? ', '! '];
-    for (const marker of sentenceMarkers) {
-      const pos = text.lastIndexOf(marker, limit - marker.length);
-      if (pos > limit * 0.6) { // Only use if reasonably close to limit
-        return pos + marker.length;
+  // For Bluesky, we need to work with grapheme-aware positions
+  const findBestBreakPoint = (text: string, limit: number, platform: 'linkedin' | 'twitter' | 'mastodon' | 'bluesky'): number => {
+    if (platform === 'bluesky') {
+      // For Bluesky, we need to find break points by grapheme count, not string index
+      try {
+        const splitter = new GraphemeSplitter();
+        const graphemes = splitter.splitGraphemes(text);
+
+        // We want to break at or before the limit (in graphemes)
+        if (graphemes.length <= limit) {
+          return text.length;
+        }
+
+        // Look for sentence endings FIRST (highest priority - complete thoughts)
+        // Search through graphemes to find the last sentence ending within the limit
+        const sentenceMarkers = ['. ', '? ', '! '];
+        let lastSentenceEndGraphemeIndex = -1;
+
+        for (let i = 0; i < Math.min(limit, graphemes.length); i++) {
+          const currentText = graphemes.slice(0, i + 1).join('');
+          for (const marker of sentenceMarkers) {
+            if (currentText.endsWith(marker)) {
+              lastSentenceEndGraphemeIndex = i;
+              break;
+            }
+          }
+        }
+
+        if (lastSentenceEndGraphemeIndex > -1) {
+          return graphemes.slice(0, lastSentenceEndGraphemeIndex + 1).join('').length;
+        }
+
+        // Look for paragraph breaks (natural content break)
+        const textUpToLimit = graphemes.slice(0, limit).join('');
+        const paragraphBreak = textUpToLimit.lastIndexOf('\n\n');
+        if (paragraphBreak > textUpToLimit.length * 0.3) {
+          return paragraphBreak + 2;
+        }
+
+        // Look for line breaks
+        const lineBreak = textUpToLimit.lastIndexOf('\n');
+        if (lineBreak > textUpToLimit.length * 0.5) {
+          return lineBreak + 1;
+        }
+
+        // Look for word boundaries (spaces)
+        const spaceBreak = textUpToLimit.lastIndexOf(' ');
+        if (spaceBreak > textUpToLimit.length * 0.6) {
+          return spaceBreak + 1;
+        }
+
+        // Use the full limit
+        return textUpToLimit.length;
+      } catch {
+        // Fallback to regular logic if grapheme-splitter fails
+        return Math.min(limit, text.length);
       }
     }
-    
-    // Look for paragraph breaks
+
+    // For other platforms, use the original logic (UTF-16 based)
+    // Look for sentence endings FIRST (highest priority - complete thoughts)
+    // Find the LAST sentence ending within the limit, regardless of position
+    const sentenceMarkers = ['. ', '? ', '! '];
+    let lastSentenceEnd = -1;
+    for (const marker of sentenceMarkers) {
+      const pos = text.lastIndexOf(marker, limit - marker.length);
+      if (pos > lastSentenceEnd) {
+        lastSentenceEnd = pos;
+      }
+    }
+    // Use the last sentence ending if found (no threshold - complete sentences are priority)
+    if (lastSentenceEnd > -1) {
+      return lastSentenceEnd + 2; // +2 for marker length (e.g., '. ')
+    }
+
+    // Look for paragraph breaks (natural content break)
     const paragraphBreak = text.lastIndexOf('\n\n', limit - 2);
-    if (paragraphBreak > limit * 0.4) {
+    if (paragraphBreak > limit * 0.3) {
       return paragraphBreak + 2;
     }
-    
+
     // Look for line breaks
     const lineBreak = text.lastIndexOf('\n', limit - 1);
-    if (lineBreak > limit * 0.6) {
+    if (lineBreak > limit * 0.5) {
       return lineBreak + 1;
     }
-    
+
     // Look for word boundaries (spaces)
     const spaceBreak = text.lastIndexOf(' ', limit - 1);
-    if (spaceBreak > limit * 0.7) {
+    if (spaceBreak > limit * 0.6) {
       return spaceBreak + 1;
     }
-    
+
     // If no good break point found, use the limit (will be handled by caller)
     return limit;
   };

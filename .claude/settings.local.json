@@ -14,7 +14,9 @@
       "Bash(xargs kill:*)",
       "Bash(npm start)",
       "Bash(curl:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []
