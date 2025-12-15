@@ -3,7 +3,7 @@
 /**
  * Convert File object to serializable format (dataUrl)
  */
-export const serializeImageForStorage = (img: { file: File; dataUrl: string; name: string }) => ({
+const serializeImageForStorage = (img: { file: File; dataUrl: string; name: string }) => ({
   dataUrl: img.dataUrl,
   name: img.name,
 });
@@ -11,7 +11,7 @@ export const serializeImageForStorage = (img: { file: File; dataUrl: string; nam
 /**
  * Convert dataUrl back to File object
  */
-export const deserializeImageFromStorage = (img: { dataUrl: string; name: string }) => {
+const deserializeImageFromStorage = (img: { dataUrl: string; name: string }) => {
   const dataUrl = img.dataUrl;
   const arr = dataUrl.split(',');
   const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';

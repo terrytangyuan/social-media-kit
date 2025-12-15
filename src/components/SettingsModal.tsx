@@ -7,8 +7,6 @@ export type SettingsModalProps = {
   darkMode: boolean;
   oauthConfig: OAuthConfig;
   onUpdateOAuthConfig: (platform: 'linkedin' | 'twitter' | 'mastodon', clientId: string) => void;
-  onUpdateMastodonConfig: (instanceUrl: string) => void;
-  onUpdateBlueskyConfig: (server: string) => void;
   onClearCache: () => void;
 };
 
@@ -18,8 +16,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   darkMode,
   oauthConfig,
   onUpdateOAuthConfig,
-  onUpdateMastodonConfig,
-  onUpdateBlueskyConfig,
   onClearCache,
 }) => {
   if (!show) return null;
@@ -157,12 +153,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <input
                     type="text"
                     value={oauthConfig.mastodon.instanceUrl}
-                    onChange={(e) => onUpdateMastodonConfig(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                    disabled
+                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-800 border-gray-600 text-gray-500" : "bg-gray-100 border-gray-300 text-gray-600"} cursor-not-allowed`}
                     placeholder="https://mastodon.social"
                   />
                   <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    Your Mastodon instance URL (e.g., https://mastodon.social)
+                    Instance URL is configured in server settings (default: https://mastodon.social)
                   </p>
                 </div>
               </div>
@@ -189,12 +185,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                   <input
                     type="text"
                     value={oauthConfig.bluesky.server}
-                    onChange={(e) => onUpdateBlueskyConfig(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-800"}`}
+                    disabled
+                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-800 border-gray-600 text-gray-500" : "bg-gray-100 border-gray-300 text-gray-600"} cursor-not-allowed`}
                     placeholder="https://bsky.social"
                   />
                   <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    Usually https://bsky.social unless using a custom server
+                    Server URL is configured in server settings (default: https://bsky.social)
                   </p>
                 </div>
               </div>

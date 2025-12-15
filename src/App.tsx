@@ -1063,16 +1063,6 @@ function App() {
     }
   };
 
-  // OAuth configuration functions for Bluesky and Mastodon
-  // Note: These are currently non-functional as oauthConfig state is managed in useAuth hook
-  // TODO: Add updateBlueskyConfig and updateMastodonConfig support to useAuth hook if needed
-  const updateBlueskyConfig = (server: string) => {
-    console.log('Note: Bluesky server config update not implemented yet:', server);
-  };
-
-  const updateMastodonConfig = (instanceUrl: string) => {
-    console.log('Note: Mastodon instance config update not implemented yet:', instanceUrl);
-  };
 
   // OAuth completion function
   const completeOAuthFlow = async (platform: 'linkedin' | 'twitter' | 'mastodon', code: string, explicitConfig?: OAuthConfig) => {
@@ -2608,8 +2598,6 @@ function App() {
           darkMode={darkMode}
           oauthConfig={oauthConfig}
           onUpdateOAuthConfig={updateOAuthConfig}
-          onUpdateMastodonConfig={updateMastodonConfig}
-          onUpdateBlueskyConfig={updateBlueskyConfig}
           onClearCache={clearOAuthLocalStorage}
         />
 
