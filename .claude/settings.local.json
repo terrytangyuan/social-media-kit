@@ -18,7 +18,16 @@
       "Bash(cat:*)",
       "Bash(grep:*)",
       "Bash(npm audit fix:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(wc:*)",
+      "Bash(1)",
+      "Bash(for func in \"togglePostSelection\" \"updatePostTitle\" \"createNewPost\" \"saveCurrentPost\" \"switchToPost\" \"deletePost\" \"deleteSelectedPosts\" \"exportPosts\" \"importPosts\" \"addPublishedPost\" \"permanentlyDeletePost\" \"toggleDeletedPostSelection\" \"permanentlyDeleteSelectedPosts\" \"moveToDeleted\" \"restorePost\" \"resetPostExecution\" \"openScheduleModal\" \"deletePersonMapping\" \"startEditingPerson\" \"cancelEditingPerson\" \"addPersonMapping\" \"updatePersonMapping\")",
+      "Bash(do if grep -q \"^  const $func\\s*=\\s*(\" src/App.tsx)",
+      "Bash(then echo \"❌ FOUND: $func\")",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

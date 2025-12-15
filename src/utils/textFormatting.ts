@@ -232,3 +232,31 @@ export const splitTextIntoChunks = (text: string, maxLength: number): string[] =
 
   return chunks;
 }; 
+/**
+ * Convert string to Unicode bold characters
+ */
+export const toBold = (input: string): string => {
+  return input.split("").map(c => boldMap[c] || c).join("");
+};
+
+/**
+ * Convert string to Unicode italic characters
+ */
+export const toItalic = (input: string): string => {
+  return input.split("").map(c => italicMap[c] || c).join("");
+};
+
+/**
+ * Convert text with **bold** and _italic_ markers to Unicode styled text
+ */
+export const toUnicodeStyle = (text: string): string => {
+  let result = text;
+
+  // Handle bold text first
+  result = result.replace(/\*\*(.*?)\*\*/g, (_, m) => toBold(m));
+
+  // Handle italic text - simpler pattern that works reliably
+  result = result.replace(/_([^_]+?)_/g, (_, m) => toItalic(m));
+
+  return result;
+};
