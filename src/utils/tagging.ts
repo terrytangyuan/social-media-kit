@@ -79,8 +79,43 @@ export const formatForPlatform = (
   personMappings: PersonMapping[],
   applyUnicodeStyle: (text: string) => string
 ): string => {
-  // First process unified tags, then apply Unicode styling
+  // First process unified tags
   const processedText = processUnifiedTags(text, platform, personMappings);
+
+  // For platforms with @-mentions, protect them from Unicode styling
+  // Extract @-mentions, apply styling to the rest, then restore mentions
+  if (platform === 'twitter' || platform === 'mastodon' || platform === 'bluesky') {
+    const mentions: { index: number; mention: string }[] = [];
+    let textWithPlaceholders = processedText;
+
+    // Extract all @-mentions (handle formats like @username, @user_name, @user.domain)
+    const mentionRegex = /@[\w._-]+/g;
+    let match;
+    let offset = 0;
+
+    while ((match = mentionRegex.exec(processedText)) !== null) {
+      const placeholder = `\uFFFC${mentions.length}\uFFFC`; // Use object replacement character as placeholder
+      mentions.push({ index: match.index, mention: match[0] });
+      textWithPlaceholders =
+        textWithPlaceholders.substring(0, match.index + offset) +
+        placeholder +
+        textWithPlaceholders.substring(match.index + offset + match[0].length);
+      offset += placeholder.length - match[0].length;
+    }
+
+    // Apply Unicode styling to text without mentions
+    let styledText = applyUnicodeStyle(textWithPlaceholders);
+
+    // Restore mentions
+    mentions.forEach((item, idx) => {
+      const placeholder = `\uFFFC${idx}\uFFFC`;
+      styledText = styledText.replace(placeholder, item.mention);
+    });
+
+    return styledText;
+  }
+
+  // For other platforms (LinkedIn), apply styling normally
   return applyUnicodeStyle(processedText);
 };
 
