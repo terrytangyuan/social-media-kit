@@ -32,6 +32,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
 
       // Look for sentence endings FIRST (highest priority - complete thoughts)
       // Search through graphemes to find the last sentence ending within the limit
+      // but avoid creating too-small chunks
       const sentenceMarkers = ['. ', '? ', '! '];
       let lastSentenceEndGraphemeIndex = -1;
 
@@ -45,7 +46,8 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
         }
       }
 
-      if (lastSentenceEndGraphemeIndex > -1) {
+      // Use sentence ending if found AND it's not too small (> 30% of limit)
+      if (lastSentenceEndGraphemeIndex > -1 && lastSentenceEndGraphemeIndex > limit * 0.3) {
         return graphemes.slice(0, lastSentenceEndGraphemeIndex + 1).join('').length;
       }
 
@@ -78,7 +80,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
 
   // For other platforms, use the original logic (UTF-16 based)
   // Look for sentence endings FIRST (highest priority - complete thoughts)
-  // Find the LAST sentence ending within the limit, regardless of position
+  // Find the LAST sentence ending within the limit, but avoid creating too-small chunks
   const sentenceMarkers = ['. ', '? ', '! '];
   let lastSentenceEnd = -1;
   for (const marker of sentenceMarkers) {
@@ -87,8 +89,9 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
       lastSentenceEnd = pos;
     }
   }
-  // Use the last sentence ending if found (no threshold - complete sentences are priority)
-  if (lastSentenceEnd > -1) {
+  // Use the last sentence ending if found AND it's not too small (> 30% of limit)
+  // This prevents creating tiny chunks like "Title! " followed by the rest
+  if (lastSentenceEnd > -1 && lastSentenceEnd > limit * 0.3) {
     return lastSentenceEnd + 2; // +2 for marker length (e.g., '. ')
   }
 
@@ -170,7 +173,6 @@ export const chunkText = (
   }).filter(chunk => getPlatformTextLength(chunk, platform) > 0);
 
   // Post-process: combine adjacent chunks if they fit together
-  // Also rebalance small chunks by taking content from the next chunk
   const optimizedChunks: string[] = [];
   let i = 0;
   while (i < validatedChunks.length) {
@@ -193,42 +195,5 @@ export const chunkText = (
     i++;
   }
 
-  // Final rebalancing: if a chunk is too small (< 30% of limit) and can't be combined with next,
-  // try to steal content from the next chunk to balance them out
-  const rebalancedChunks: string[] = [];
-  for (let i = 0; i < optimizedChunks.length; i++) {
-    let currentChunk = optimizedChunks[i];
-    const currentLength = getPlatformTextLength(currentChunk, platform);
-
-    // Check if this chunk is too small and there's a next chunk
-    if (currentLength < limit * 0.3 && i + 1 < optimizedChunks.length) {
-      const nextChunk = optimizedChunks[i + 1];
-      const nextLength = getPlatformTextLength(nextChunk, platform);
-
-      // Try to rebalance by moving content from next chunk to current
-      // Find a good break point in the next chunk that would balance them
-      const targetSize = Math.floor((currentLength + nextLength) / 2);
-      const moveAmount = Math.min(targetSize - currentLength, nextLength - limit * 0.3);
-
-      if (moveAmount > 0) {
-        // Find best break point in next chunk around moveAmount
-        const breakPoint = findBestBreakPoint(nextChunk, moveAmount, platform);
-        const toMove = nextChunk.substring(0, breakPoint).replace(/\s+$/, '');
-        const remaining = nextChunk.substring(breakPoint).replace(/^\s+/, '');
-
-        // Only rebalance if both chunks will be reasonable sizes
-        const newCurrentLength = getPlatformTextLength(currentChunk + ' ' + toMove, platform);
-        const newNextLength = getPlatformTextLength(remaining, platform);
-
-        if (newCurrentLength <= limit && newNextLength > limit * 0.2) {
-          currentChunk = currentChunk + ' ' + toMove;
-          optimizedChunks[i + 1] = remaining;
-        }
-      }
-    }
-
-    rebalancedChunks.push(currentChunk);
-  }
-
-  return rebalancedChunks;
+  return optimizedChunks;
 };
