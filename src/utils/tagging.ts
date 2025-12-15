@@ -44,11 +44,14 @@ export const processUnifiedTags = (
           // For LinkedIn, always use display name since manual tagging is required
           return `@${person.displayName}`;
         case 'twitter':
-          return person.twitter ? `@${person.twitter}` : person.displayName;
+          // Remove @ prefix if present, then add it back
+          return person.twitter ? `@${person.twitter.replace(/^@/, '')}` : person.displayName;
         case 'mastodon':
-          return person.mastodon ? `@${person.mastodon}` : person.displayName;
+          // Remove @ prefix if present, then add it back
+          return person.mastodon ? `@${person.mastodon.replace(/^@/, '')}` : person.displayName;
         case 'bluesky':
-          return person.bluesky ? `@${person.bluesky}` : person.displayName;
+          // Remove @ prefix if present, then add it back
+          return person.bluesky ? `@${person.bluesky.replace(/^@/, '')}` : person.displayName;
         default:
           return `@${person.displayName}`;
       }
@@ -79,4 +82,72 @@ export const formatForPlatform = (
   // First process unified tags, then apply Unicode styling
   const processedText = processUnifiedTags(text, platform, personMappings);
   return applyUnicodeStyle(processedText);
+};
+
+/**
+ * Create a new tagging system instance with person mapping management
+ * This factory function is used by tests and can be used to create isolated tagging systems
+ */
+export const createTaggingSystem = (): TaggingSystem => {
+  const personMappings: PersonMapping[] = [];
+
+  return {
+    personMappings,
+
+    addPersonMapping(person: Omit<PersonMapping, 'id' | 'createdAt' | 'updatedAt'>): PersonMapping {
+      const now = new Date().toISOString();
+      const newPerson: PersonMapping = {
+        ...person,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now
+      };
+      personMappings.push(newPerson);
+      return newPerson;
+    },
+
+    updatePersonMapping(id: string, updates: Partial<PersonMapping>): boolean {
+      const index = personMappings.findIndex(p => p.id === id);
+      if (index === -1) return false;
+
+      personMappings[index] = {
+        ...personMappings[index],
+        ...updates,
+        id: personMappings[index].id, // Preserve ID
+        createdAt: personMappings[index].createdAt, // Preserve creation date
+        updatedAt: new Date().toISOString()
+      };
+      return true;
+    },
+
+    deletePersonMapping(id: string): boolean {
+      const index = personMappings.findIndex(p => p.id === id);
+      if (index === -1) return false;
+      personMappings.splice(index, 1);
+      return true;
+    },
+
+    getPersonMapping(id: string): PersonMapping | undefined {
+      return personMappings.find(p => p.id === id);
+    },
+
+    convertUnifiedTags(text: string, platform: 'linkedin' | 'twitter' | 'bluesky'): string {
+      return processUnifiedTags(text, platform, personMappings);
+    },
+
+    validateTagFormat(tag: string): boolean {
+      // Validate @{Name} format (trim whitespace first)
+      return /^@\{[^}]+\}$/.test(tag.trim());
+    },
+
+    extractUnifiedTags(text: string): string[] {
+      const tagPattern = /@\{([^}]+)\}/g;
+      const tags: string[] = [];
+      let match;
+      while ((match = tagPattern.exec(text)) !== null) {
+        tags.push(match[0]); // Full tag including @{}
+      }
+      return tags;
+    }
+  };
 }; 
