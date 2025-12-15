@@ -158,7 +158,7 @@ export const chunkText = (
   }
 
   // Final safety check: ensure no chunk exceeds limit
-  return chunks.map(chunk => {
+  const validatedChunks = chunks.map(chunk => {
     const chunkLength = getPlatformTextLength(chunk, platform);
     if (chunkLength > limit) {
       console.warn(`Chunk exceeds ${platform} limit (${chunkLength}/${limit}):`, chunk.substring(0, 50) + '...');
@@ -168,4 +168,67 @@ export const chunkText = (
     }
     return chunk;
   }).filter(chunk => getPlatformTextLength(chunk, platform) > 0);
+
+  // Post-process: combine adjacent chunks if they fit together
+  // Also rebalance small chunks by taking content from the next chunk
+  const optimizedChunks: string[] = [];
+  let i = 0;
+  while (i < validatedChunks.length) {
+    let combinedChunk = validatedChunks[i];
+
+    // Try to combine with next chunks while under limit
+    while (i + 1 < validatedChunks.length) {
+      const nextChunk = validatedChunks[i + 1];
+      const testCombined = combinedChunk + ' ' + nextChunk;
+
+      if (getPlatformTextLength(testCombined, platform) <= limit) {
+        combinedChunk = testCombined;
+        i++;
+      } else {
+        break;
+      }
+    }
+
+    optimizedChunks.push(combinedChunk);
+    i++;
+  }
+
+  // Final rebalancing: if a chunk is too small (< 30% of limit) and can't be combined with next,
+  // try to steal content from the next chunk to balance them out
+  const rebalancedChunks: string[] = [];
+  for (let i = 0; i < optimizedChunks.length; i++) {
+    let currentChunk = optimizedChunks[i];
+    const currentLength = getPlatformTextLength(currentChunk, platform);
+
+    // Check if this chunk is too small and there's a next chunk
+    if (currentLength < limit * 0.3 && i + 1 < optimizedChunks.length) {
+      const nextChunk = optimizedChunks[i + 1];
+      const nextLength = getPlatformTextLength(nextChunk, platform);
+
+      // Try to rebalance by moving content from next chunk to current
+      // Find a good break point in the next chunk that would balance them
+      const targetSize = Math.floor((currentLength + nextLength) / 2);
+      const moveAmount = Math.min(targetSize - currentLength, nextLength - limit * 0.3);
+
+      if (moveAmount > 0) {
+        // Find best break point in next chunk around moveAmount
+        const breakPoint = findBestBreakPoint(nextChunk, moveAmount, platform);
+        const toMove = nextChunk.substring(0, breakPoint).replace(/\s+$/, '');
+        const remaining = nextChunk.substring(breakPoint).replace(/^\s+/, '');
+
+        // Only rebalance if both chunks will be reasonable sizes
+        const newCurrentLength = getPlatformTextLength(currentChunk + ' ' + toMove, platform);
+        const newNextLength = getPlatformTextLength(remaining, platform);
+
+        if (newCurrentLength <= limit && newNextLength > limit * 0.2) {
+          currentChunk = currentChunk + ' ' + toMove;
+          optimizedChunks[i + 1] = remaining;
+        }
+      }
+    }
+
+    rebalancedChunks.push(currentChunk);
+  }
+
+  return rebalancedChunks;
 };
