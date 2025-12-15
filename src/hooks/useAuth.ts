@@ -65,17 +65,99 @@ export const useAuth = () => {
         setAuth(mergedAuth);
       }
 
-      if (savedOAuthConfig) {
-        const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
-        const mergedConfig: OAuthConfig = {
-          linkedin: { ...DEFAULT_OAUTH_CONFIG.linkedin, ...(parsedOAuthConfig.linkedin || {}) },
-          twitter: { ...DEFAULT_OAUTH_CONFIG.twitter, ...(parsedOAuthConfig.twitter || {}) },
-          mastodon: { ...DEFAULT_OAUTH_CONFIG.mastodon, ...(parsedOAuthConfig.mastodon || {}) },
-          bluesky: { ...DEFAULT_OAUTH_CONFIG.bluesky, ...(parsedOAuthConfig.bluesky || {}) }
-        };
-        setOauthConfig(mergedConfig);
-        setOauthConfigLoaded(true);
-      }
+      // Load OAuth configuration from server first, then merge with localStorage
+      const loadOAuthConfig = async () => {
+        try {
+          console.log('🔄 Loading OAuth config from server...');
+          const response = await fetch('/api/oauth/config');
+          if (response.ok) {
+            const serverConfig = await response.json();
+            console.log('✅ Server OAuth config loaded:', serverConfig);
+
+            // If we have saved config in localStorage, merge it with server config
+            if (savedOAuthConfig) {
+              try {
+                const localConfig = JSON.parse(savedOAuthConfig);
+                console.log('📋 Merging with localStorage config:', localConfig);
+
+                // Merge configs - server provides LinkedIn/Twitter/Mastodon client IDs from .env,
+                // localStorage provides custom settings like Mastodon instance URL
+                const mergedConfig: OAuthConfig = {
+                  linkedin: {
+                    ...DEFAULT_OAUTH_CONFIG.linkedin,
+                    ...(serverConfig.linkedin || {}),
+                    // Override with any local overrides (though typically server takes precedence for client IDs)
+                    ...(localConfig.linkedin || {})
+                  },
+                  twitter: {
+                    ...DEFAULT_OAUTH_CONFIG.twitter,
+                    ...(serverConfig.twitter || {}),
+                    ...(localConfig.twitter || {})
+                  },
+                  mastodon: {
+                    ...DEFAULT_OAUTH_CONFIG.mastodon,
+                    ...(serverConfig.mastodon || {}),
+                    // Preserve instanceUrl from localStorage if present
+                    instanceUrl: localConfig.mastodon?.instanceUrl || serverConfig.mastodon?.instanceUrl || DEFAULT_OAUTH_CONFIG.mastodon.instanceUrl,
+                    // Use client ID from localStorage if customized, otherwise from server
+                    clientId: localConfig.mastodon?.clientId || serverConfig.mastodon?.clientId || ''
+                  },
+                  bluesky: {
+                    ...DEFAULT_OAUTH_CONFIG.bluesky,
+                    ...(serverConfig.bluesky || {}),
+                    ...(localConfig.bluesky || {})
+                  }
+                };
+
+                console.log('🔀 Final merged config:', mergedConfig);
+                setOauthConfig(mergedConfig);
+              } catch (parseError) {
+                console.error('Error parsing localStorage OAuth config, using server config only:', parseError);
+                setOauthConfig(serverConfig);
+              }
+            } else {
+              // No localStorage config, just use server config
+              console.log('📋 No localStorage config, using server config only');
+              setOauthConfig(serverConfig);
+            }
+            setOauthConfigLoaded(true);
+          } else {
+            console.warn('⚠️ Failed to load server OAuth config, falling back to localStorage/defaults');
+            // Fallback to localStorage if server fetch fails
+            if (savedOAuthConfig) {
+              const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
+              const mergedConfig: OAuthConfig = {
+                linkedin: { ...DEFAULT_OAUTH_CONFIG.linkedin, ...(parsedOAuthConfig.linkedin || {}) },
+                twitter: { ...DEFAULT_OAUTH_CONFIG.twitter, ...(parsedOAuthConfig.twitter || {}) },
+                mastodon: { ...DEFAULT_OAUTH_CONFIG.mastodon, ...(parsedOAuthConfig.mastodon || {}) },
+                bluesky: { ...DEFAULT_OAUTH_CONFIG.bluesky, ...(parsedOAuthConfig.bluesky || {}) }
+              };
+              setOauthConfig(mergedConfig);
+            } else {
+              setOauthConfig(DEFAULT_OAUTH_CONFIG);
+            }
+            setOauthConfigLoaded(true);
+          }
+        } catch (error) {
+          console.error('Error loading OAuth config from server:', error);
+          // Fallback to localStorage if server fetch fails
+          if (savedOAuthConfig) {
+            const parsedOAuthConfig = JSON.parse(savedOAuthConfig);
+            const mergedConfig: OAuthConfig = {
+              linkedin: { ...DEFAULT_OAUTH_CONFIG.linkedin, ...(parsedOAuthConfig.linkedin || {}) },
+              twitter: { ...DEFAULT_OAUTH_CONFIG.twitter, ...(parsedOAuthConfig.twitter || {}) },
+              mastodon: { ...DEFAULT_OAUTH_CONFIG.mastodon, ...(parsedOAuthConfig.mastodon || {}) },
+              bluesky: { ...DEFAULT_OAUTH_CONFIG.bluesky, ...(parsedOAuthConfig.bluesky || {}) }
+            };
+            setOauthConfig(mergedConfig);
+          } else {
+            setOauthConfig(DEFAULT_OAUTH_CONFIG);
+          }
+          setOauthConfigLoaded(true);
+        }
+      };
+
+      loadOAuthConfig();
     } catch (error) {
       console.error('Error loading saved authentication:', error);
       // Reset to defaults if parsing fails

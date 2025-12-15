@@ -1076,7 +1076,8 @@ function App() {
     
     // Check if client ID is configured
     if (!config.clientId) {
-      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED\n\nPlease:\n1. Open ⚙️ Settings\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save settings\n4. Try authentication again`);
+      const platformName = platform === 'linkedin' ? 'LinkedIn' : platform === 'twitter' ? 'Twitter' : platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED\n\nPlease:\n1. Open ⚙️ Settings\n2. Enter your ${platformName} Client ID\n3. Save settings\n4. Try authentication again`);
       return;
     }
     
@@ -1202,7 +1203,8 @@ function App() {
     // Check if client ID is properly configured
     if (!config.clientId || config.clientId === '') {
       console.log('❌ Client ID validation failed');
-      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platform === 'linkedin' ? 'LinkedIn' : 'Twitter'} Client ID\n3. Save the settings\n\nSee SETUP.md for detailed instructions.`);
+      const platformName = platform === 'linkedin' ? 'LinkedIn' : platform === 'twitter' ? 'Twitter' : platform === 'mastodon' ? 'Mastodon' : 'Bluesky';
+      alert(`❌ ${platform.toUpperCase()} CLIENT ID NOT CONFIGURED!\n\nPlease configure your OAuth settings:\n1. Click the ⚙️ Settings button\n2. Enter your ${platformName} Client ID\n3. Save the settings\n\nSee SETUP.md for detailed instructions.`);
       return;
     }
     
