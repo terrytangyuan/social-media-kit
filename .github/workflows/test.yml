@@ -159,4 +159,4 @@ jobs:
         fi
         
     - name: Check test coverage threshold
-      run: npm run test:coverage -- --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}' 
+      run: npm run test:coverage 

@@ -30,7 +30,8 @@
       "Bash(git stash:*)",
       "Bash(if [ -f .env ])",
       "Bash(then grep -E \"MASTODON_CLIENT_ID|LINKEDIN_CLIENT_ID|TWITTER_CLIENT_ID\" .env)",
-      "Bash(else echo \".env file not found\")"
+      "Bash(else echo \".env file not found\")",
+      "Bash(npm run test:coverage:*)"
     ],
     "deny": [],
     "ask": []
