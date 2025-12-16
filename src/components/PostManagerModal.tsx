@@ -128,8 +128,8 @@ export function PostManagerModal({
         </p>
       ) : (
         <>
-          {/* Bulk selection controls */}
-          {posts.length > 0 && (
+          {/* Bulk selection controls - only show when there are multiple posts */}
+          {posts.length > 1 && (
             <div className={`flex items-center justify-between mb-3 p-2 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
