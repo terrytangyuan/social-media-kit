@@ -243,12 +243,7 @@ function App() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [selectedLogoutPlatforms, setSelectedLogoutPlatforms] = useState<string[]>([]);
   
-  // Auto-sync state
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
-    const saved = localStorage.getItem('autoSyncEnabled');
-    return saved !== null ? JSON.parse(saved) : true; // Default to enabled
-  });
-
+  // Auto-sync is always enabled
   const [showOAuthSettings, setShowOAuthSettings] = useState(false);
 
   // X Premium setting
@@ -401,17 +396,17 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("socialMediaPosts", JSON.stringify(posts));
-    
-    // Auto-sync posts when they change
-    if (posts.length > 0 && autoSyncEnabled) {
+
+    // Auto-sync posts when they change (always enabled)
+    if (posts.length > 0) {
       // Debounce auto-sync to avoid excessive saves
       const timeoutId = setTimeout(() => {
         autoSyncPosts();
       }, 1000);
-      
+
       return () => clearTimeout(timeoutId);
     }
-  }, [posts, autoSyncEnabled]);
+  }, [posts]);
 
   useEffect(() => {
     localStorage.setItem("socialMediaPublishedPosts", JSON.stringify(publishedPosts));
@@ -970,10 +965,8 @@ function App() {
     fileInput.click();
   };
 
-  // Auto-sync functions
+  // Auto-sync functions (always enabled)
   const autoSyncPosts = () => {
-    if (!autoSyncEnabled) return;
-
     try {
       // Auto-save current post before syncing
       if (currentPostId) {
@@ -997,8 +990,6 @@ function App() {
   };
 
   const loadAutoSyncedPosts = () => {
-    if (!autoSyncEnabled) return;
-    
     try {
       const syncedData = localStorage.getItem('autoSyncData');
       if (!syncedData) return;
@@ -1049,19 +1040,6 @@ function App() {
     }
   };
 
-  const toggleAutoSync = () => {
-    const newValue = !autoSyncEnabled;
-    setAutoSyncEnabled(newValue);
-    localStorage.setItem('autoSyncEnabled', JSON.stringify(newValue));
-    
-    if (newValue) {
-      // If enabling auto-sync, sync immediately
-      autoSyncPosts();
-      showNotification('✅ Auto-sync enabled and posts synced');
-    } else {
-      showNotification('❌ Auto-sync disabled');
-    }
-  };
 
 
   // OAuth completion function
@@ -2611,7 +2589,6 @@ function App() {
           selectedPostIds={selectedPostIds}
           publishedPostsCount={publishedPosts.length}
           deletedPostsCount={getActualDeletedPosts().length}
-          autoSyncEnabled={autoSyncEnabled}
           scheduledPostsStatus={scheduledPostsStatus}
           onCreateNewPost={createNewPost}
           onSwitchToPost={switchToPost}
@@ -2622,7 +2599,6 @@ function App() {
           onDeleteSelectedPosts={deleteSelectedPosts}
           onLoadPostsFromDisk={loadPostsFromDisk}
           onSavePostsToDisk={savePostsToDisk}
-          onToggleAutoSync={toggleAutoSync}
           onShowPublishedPosts={() => setShowPublishedPosts(true)}
           onShowDeletedPosts={() => setShowDeletedPosts(true)}
           formatTimezoneTime={formatTimezoneTime}
@@ -2718,47 +2694,12 @@ function App() {
               darkMode={darkMode}
             />
           </div>
-                        <button 
-                onClick={() => setShowTagManager(true)} 
+                        <button
+                onClick={() => setShowTagManager(true)}
                 className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-xl text-sm"
               >
                 🏷️ Tags
               </button>
-              {!autoSyncEnabled && (
-                <button
-                  onClick={() => {
-                    if (!text.trim()) {
-                      alert('❌ Please write some content before saving');
-                      return;
-                    }
-                    
-                    if (!currentPostId) {
-                      // Create new post if no current post
-                      const currentTime = getCurrentDateTimeString();
-                      const newPost = {
-                        id: Date.now().toString(),
-                        title: `Post ${posts.length + 1}`,
-                        content: text,
-                        scheduleTime: scheduleTime || currentTime,
-                        timezone: timezone,
-                        createdAt: new Date().toISOString()
-                      };
-                      setPosts(prev => [...prev, newPost]);
-                      setCurrentPostId(newPost.id);
-                      showNotification(`✅ Post saved as "${newPost.title}"`);
-                    } else {
-                      // Update existing post
-                      saveCurrentPost();
-                      const currentPost = posts.find(p => p.id === currentPostId);
-                      showNotification(`✅ Post "${currentPost?.title || 'Untitled'}" updated`);
-                    }
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-xl text-sm"
-                >
-                  💾 Save Current
-                </button>
-              )}
-
             </div>
 
         <TextEditor

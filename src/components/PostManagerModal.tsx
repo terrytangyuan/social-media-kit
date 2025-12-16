@@ -28,7 +28,6 @@ interface PostManagerModalProps {
   selectedPostIds: Set<string>;
   publishedPostsCount: number;
   deletedPostsCount: number;
-  autoSyncEnabled: boolean;
   scheduledPostsStatus: {
     [postId: string]: 'pending' | 'executing' | 'completed' | 'failed';
   };
@@ -41,7 +40,6 @@ interface PostManagerModalProps {
   onDeleteSelectedPosts: () => void;
   onLoadPostsFromDisk: () => void;
   onSavePostsToDisk: () => void;
-  onToggleAutoSync: () => void;
   onShowPublishedPosts: () => void;
   onShowDeletedPosts: () => void;
   formatTimezoneTime: (datetime: string, tz: string) => string;
@@ -55,7 +53,6 @@ export function PostManagerModal({
   selectedPostIds,
   publishedPostsCount,
   deletedPostsCount,
-  autoSyncEnabled,
   scheduledPostsStatus,
   onCreateNewPost,
   onSwitchToPost,
@@ -66,7 +63,6 @@ export function PostManagerModal({
   onDeleteSelectedPosts,
   onLoadPostsFromDisk,
   onSavePostsToDisk,
-  onToggleAutoSync,
   onShowPublishedPosts,
   onShowDeletedPosts,
   formatTimezoneTime,
@@ -78,21 +74,6 @@ export function PostManagerModal({
       <div className="mb-3">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-semibold">📝 Manage Posts</h2>
-          <button
-            onClick={onToggleAutoSync}
-            className={`text-sm px-3 py-1 rounded-lg ${
-              autoSyncEnabled
-                ? darkMode
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-green-500 hover:bg-green-600 text-white"
-                : darkMode
-                  ? "bg-gray-600 hover:bg-gray-500 text-white"
-                  : "bg-gray-400 hover:bg-gray-500 text-white"
-            }`}
-            title={autoSyncEnabled ? "Auto-sync enabled - posts automatically saved" : "Auto-sync disabled - manual save required"}
-          >
-            {autoSyncEnabled ? "🔄 Auto-Sync ON" : "⏸️ Auto-Sync OFF"}
-          </button>
         </div>
 
         {/* Action buttons organized in logical groups */}
