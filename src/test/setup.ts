@@ -89,6 +89,16 @@ Object.defineProperty(window, 'crypto', {
       }
       return arr;
     }),
+    subtle: {
+      digest: jest.fn(async (algorithm: string, data: BufferSource) => {
+        // Return a mock hash (32 bytes for SHA-256)
+        const hash = new Uint8Array(32);
+        for (let i = 0; i < 32; i++) {
+          hash[i] = i * 2;
+        }
+        return hash.buffer;
+      }),
+    },
   },
 });
 
