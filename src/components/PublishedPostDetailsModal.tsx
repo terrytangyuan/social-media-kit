@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PublishedPost } from '../types';
 
 interface PublishedPostDetailsModalProps {
@@ -14,7 +14,19 @@ export const PublishedPostDetailsModal: React.FC<PublishedPostDetailsModalProps>
   darkMode,
   onDeletePublished
 }) => {
+  const [contentCopied, setContentCopied] = useState(false);
+
   if (!post) return null;
+
+  const handleCopyContent = async () => {
+    try {
+      await navigator.clipboard.writeText(post.content);
+      setContentCopied(true);
+      setTimeout(() => setContentCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy content:', err);
+    }
+  };
 
   return (
     <div
@@ -53,7 +65,23 @@ export const PublishedPostDetailsModal: React.FC<PublishedPostDetailsModalProps>
 
             {/* Content */}
             <div>
-              <h4 className={`font-medium mb-2 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Content</h4>
+              <div className="flex justify-between items-center mb-2">
+                <h4 className={`font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Content</h4>
+                <button
+                  onClick={handleCopyContent}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                    contentCopied
+                      ? darkMode
+                        ? "bg-green-600 text-white"
+                        : "bg-green-500 text-white"
+                      : darkMode
+                        ? "bg-gray-600 hover:bg-gray-500 text-white"
+                        : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                  }`}
+                >
+                  {contentCopied ? "✓ Copied!" : "📋 Copy"}
+                </button>
+              </div>
               <div className={`p-4 rounded-lg border ${darkMode ? "bg-gray-700 border-gray-600" : "bg-gray-50 border-gray-300"}`}>
                 <p className="whitespace-pre-wrap text-sm">{post.content}</p>
               </div>
