@@ -77,7 +77,6 @@ app.use(express.static('public', {
 // OAuth configuration endpoint
 app.get('/api/oauth/config', (req, res) => {
   const mastodonInstanceUrl = process.env.MASTODON_INSTANCE_URL || 'https://mastodon.social';
-  console.log('📋 OAuth Config Request - Mastodon Instance URL from env:', mastodonInstanceUrl);
 
   const config = {
     linkedin: {
