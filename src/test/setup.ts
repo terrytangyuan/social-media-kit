@@ -49,22 +49,35 @@ Object.defineProperty(window, 'sessionStorage', {
   value: localStorageMock
 });
 
-// Mock window.location
-delete (window as any).location;
-(window as any).location = {
-  href: 'http://localhost:3000',
-  origin: 'http://localhost:3000',
-  protocol: 'http:',
-  host: 'localhost:3000',
-  hostname: 'localhost',
-  port: '3000',
-  pathname: '/',
-  search: '',
-  hash: '',
-  assign: jest.fn(),
-  replace: jest.fn(),
-  reload: jest.fn(),
-};
+// Mock window.location methods individually to avoid jsdom navigation errors
+// Use try-catch to handle redefinition errors across multiple test files
+try {
+  Object.defineProperty(window.location, 'assign', {
+    configurable: true,
+    writable: true,
+    value: jest.fn(),
+  });
+} catch (e) {
+  // Already defined, skip
+}
+try {
+  Object.defineProperty(window.location, 'replace', {
+    configurable: true,
+    writable: true,
+    value: jest.fn(),
+  });
+} catch (e) {
+  // Already defined, skip
+}
+try {
+  Object.defineProperty(window.location, 'reload', {
+    configurable: true,
+    writable: true,
+    value: jest.fn(),
+  });
+} catch (e) {
+  // Already defined, skip
+}
 
 // Mock crypto for UUID generation
 Object.defineProperty(window, 'crypto', {
