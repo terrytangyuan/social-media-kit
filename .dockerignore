@@ -1,0 +1,84 @@
+# Dependencies (will be installed in container)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# Build outputs (will be built inside container)
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment files (should be passed as environment variables)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Testing
+coverage/
+.nyc_output/
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+tests/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+!README.md
+SETUP.md
+TESTING.md
+CONTRIBUTING.md
+CHANGELOG.md
+screenshots/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Docker files (prevent recursion)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Cache directories
+.cache/
+.eslintcache
+.stylelintcache
+.npm/
+
+# Claude/AI
+.claude/
+.claudeignore
+CLAUDE.md
+
+# Plans
+.plans/

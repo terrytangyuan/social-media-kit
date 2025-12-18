@@ -24,7 +24,9 @@
       "Bash(git stash:*)",
       "Bash(npm run test:coverage:*)",
       "Bash(git checkout src/hooks/useImageManager.test.ts)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(npm --version)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": []
