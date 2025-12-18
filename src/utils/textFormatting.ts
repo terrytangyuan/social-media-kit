@@ -255,8 +255,32 @@ export const toUnicodeStyle = (text: string): string => {
   // Handle bold text first
   result = result.replace(/\*\*(.*?)\*\*/g, (_, m) => toBold(m));
 
+  // Protect URLs and @ mentions from italic formatting by temporarily replacing them
+  const protectedPlaceholders: string[] = [];
+
+  // Protect URLs (http://, https://, www.)
+  result = result.replace(/https?:\/\/[^\s]+|www\.[^\s]+/gi, (match) => {
+    const placeholder = `URLPLACEHOLDER${protectedPlaceholders.length}PLACEHOLDER`;
+    protectedPlaceholders.push(match);
+    return placeholder;
+  });
+
+  // Protect @ mentions (including those with underscores)
+  result = result.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
+    const placeholder = `MENTIONPLACEHOLDER${protectedPlaceholders.length}PLACEHOLDER`;
+    protectedPlaceholders.push(match);
+    return placeholder;
+  });
+
   // Handle italic text - simpler pattern that works reliably
   result = result.replace(/_([^_]+?)_/g, (_, m) => toItalic(m));
+
+  // Restore the protected content
+  protectedPlaceholders.forEach((content, index) => {
+    const isUrl = content.match(/^(https?:\/\/|www\.)/i);
+    const placeholderType = isUrl ? 'URLPLACEHOLDER' : 'MENTIONPLACEHOLDER';
+    result = result.replace(`${placeholderType}${index}PLACEHOLDER`, content);
+  });
 
   return result;
 };

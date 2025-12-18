@@ -6,7 +6,8 @@ import {
   countWords,
   hasFormatting,
   removeFormatting,
-  splitTextIntoChunks
+  splitTextIntoChunks,
+  toUnicodeStyle
 } from './textFormatting';
 
 describe('Text Formatting Utilities', () => {
@@ -300,6 +301,55 @@ At #KubeCon North America 2025 in Atlanta, I had the pleasure of joining Stephen
     it('should handle maxLength of 1', () => {
       const result = splitTextIntoChunks('Hi', 1);
       expect(result).toEqual(['H', 'i']);
+    });
+  });
+
+  describe('toUnicodeStyle', () => {
+    it('should convert **bold** text to Unicode bold', () => {
+      expect(toUnicodeStyle('**Hello World**')).toBe('𝗛𝗲𝗹𝗹𝗼 𝗪𝗼𝗿𝗹𝗱');
+      expect(toUnicodeStyle('**Test**')).toBe('𝗧𝗲𝘀𝘁');
+    });
+
+    it('should convert _italic_ text to Unicode italic', () => {
+      expect(toUnicodeStyle('_Hello World_')).toBe('𝘏𝘦𝘭𝘭𝘰 𝘞𝘰𝘳𝘭𝘥');
+      expect(toUnicodeStyle('_Test_')).toBe('𝘛𝘦𝘴𝘵');
+    });
+
+    it('should not italicize URLs with underscores', () => {
+      const text = 'Check out https://example.com/path_with_underscores_here for info';
+      const result = toUnicodeStyle(text);
+      expect(result).toBe(text); // No italic formatting should be applied
+    });
+
+    it('should not italicize multiple URLs with underscores', () => {
+      const text = '1. First job: https://example.com/job_R-123\n\n2. Second job: https://example.com/another_R-456';
+      const result = toUnicodeStyle(text);
+      expect(result).toBe(text); // No italic formatting between URLs
+    });
+
+    it('should preserve @ mentions with underscores', () => {
+      expect(toUnicodeStyle('@_llm_d_')).toBe('@_llm_d_');
+      expect(toUnicodeStyle('Hello @_user_ world')).toBe('Hello @_user_ world');
+    });
+
+    it('should still format italic text correctly while protecting URLs', () => {
+      const text = 'This is _italic_ text and a URL https://example.com/path_with_underscore is here';
+      const result = toUnicodeStyle(text);
+      expect(result).toBe('This is 𝘪𝘵𝘢𝘭𝘪𝘤 text and a URL https://example.com/path_with_underscore is here');
+    });
+
+    it('should handle the user reported issue with job postings', () => {
+      const text = '1. Job: https://site.com/job_R-111\n\n2. Another Job: https://site.com/job_R-222';
+      const result = toUnicodeStyle(text);
+      // The text between the two URLs should NOT be italicized
+      expect(result).toBe(text);
+      expect(result).not.toMatch(/𝘈𝘯𝘰𝘵𝘩𝘦𝘳/); // "Another" should not be in italic
+    });
+
+    it('should handle mixed bold, italic, URLs, and mentions', () => {
+      const text = '**Bold text** and _italic_ with https://example.com/path_under and @_user_ mention';
+      const result = toUnicodeStyle(text);
+      expect(result).toBe('𝗕𝗼𝗹𝗱 𝘁𝗲𝘅𝘁 and 𝘪𝘵𝘢𝘭𝘪𝘤 with https://example.com/path_under and @_user_ mention');
     });
   });
 });
