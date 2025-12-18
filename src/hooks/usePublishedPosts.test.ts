@@ -12,9 +12,13 @@ describe('usePublishedPosts Hook', () => {
     originalPostId: `original-${id}`,
     publishedAt: new Date().toISOString(),
     timezone: 'America/New_York',
-    platforms: {
-      linkedin: { postId: 'li-123', postUrl: 'https://linkedin.com/post/123' }
-    }
+    platformResults: [{
+      platform: 'linkedin',
+      success: true,
+      postId: 'li-123',
+      postUrl: 'https://linkedin.com/post/123',
+      publishedAt: new Date().toISOString()
+    }]
   });
 
   describe('Initial State', () => {

@@ -5,6 +5,10 @@ export const usePublishedPosts = () => {
   const [publishedPosts, setPublishedPosts] = useState<PublishedPost[]>([]);
   const [deletedPosts, setDeletedPosts] = useState<DeletedPost[]>([]);
 
+  // Keep a ref to the current deletedPosts for synchronous access
+  const deletedPostsRef = useRef<DeletedPost[]>([]);
+  deletedPostsRef.current = deletedPosts;
+
   const [showPublishedPosts, setShowPublishedPosts] = useState(false);
   const [showDeletedPosts, setShowDeletedPosts] = useState(false);
 
@@ -20,24 +24,26 @@ export const usePublishedPosts = () => {
   }, []);
 
   const moveToDeleted = useCallback((postId: string) => {
-    const post = publishedPosts.find(p => p.id === postId);
-    if (!post) return;
+    setPublishedPosts(prev => {
+      const post = prev.find(p => p.id === postId);
+      if (!post) return prev;
 
-    const deletedPost: DeletedPost = {
-      id: post.id,
-      title: post.title,
-      content: post.content,
-      originalPostId: post.originalPostId,
-      deletedAt: new Date().toISOString(),
-      timezone: post.timezone,
-      createdAt: post.publishedAt, // Use publishedAt as createdAt
-      images: post.images,
-      platformImageSelections: post.platformImageSelections
-    };
+      const deletedPost: DeletedPost = {
+        id: post.id,
+        title: post.title,
+        content: post.content,
+        originalPostId: post.originalPostId,
+        deletedAt: new Date().toISOString(),
+        timezone: post.timezone,
+        createdAt: post.publishedAt, // Use publishedAt as createdAt
+        images: post.images,
+        platformImageSelections: post.platformImageSelections
+      };
 
-    setDeletedPosts(prev => [deletedPost, ...prev]);
-    setPublishedPosts(prev => prev.filter(p => p.id !== postId));
-  }, [publishedPosts]);
+      setDeletedPosts(prevDeleted => [deletedPost, ...prevDeleted]);
+      return prev.filter(p => p.id !== postId);
+    });
+  }, []);
 
   const permanentlyDeletePost = useCallback((postId: string) => {
     setDeletedPosts(prev => prev.filter(p => p.id !== postId));
@@ -51,14 +57,16 @@ export const usePublishedPosts = () => {
   }, []);
 
   const restorePost = useCallback((postId: string) => {
-    const post = deletedPosts.find(p => p.id === postId);
+    // Use ref to access current state synchronously
+    const post = deletedPostsRef.current.find(p => p.id === postId);
     if (!post) return null;
 
+    // Update state to remove the post
     setDeletedPosts(prev => prev.filter(p => p.id !== postId));
 
     // Return the post data so it can be restored in the main posts list
     return post;
-  }, [deletedPosts]);
+  }, []);
 
   const toggleDeletedPostSelection = useCallback((postId: string, index: number, shiftKey: boolean = false) => {
     if (shiftKey && lastClickedDeletedIndexRef.current !== null) {
@@ -66,14 +74,17 @@ export const usePublishedPosts = () => {
       const start = Math.min(lastClickedDeletedIndexRef.current, index);
       const end = Math.max(lastClickedDeletedIndexRef.current, index);
 
-      setSelectedDeletedPostIds(prev => {
-        const newSet = new Set(prev);
-        for (let i = start; i <= end; i++) {
-          if (deletedPosts[i]) {
-            newSet.add(deletedPosts[i].id);
+      setDeletedPosts(prevDeleted => {
+        setSelectedDeletedPostIds(prev => {
+          const newSet = new Set(prev);
+          for (let i = start; i <= end; i++) {
+            if (prevDeleted[i]) {
+              newSet.add(prevDeleted[i].id);
+            }
           }
-        }
-        return newSet;
+          return newSet;
+        });
+        return prevDeleted;
       });
     } else {
       // Normal click: toggle single item
@@ -88,12 +99,15 @@ export const usePublishedPosts = () => {
       });
       lastClickedDeletedIndexRef.current = index;
     }
-  }, [deletedPosts]);
+  }, []);
 
   const selectAllDeletedPosts = useCallback(() => {
-    setSelectedDeletedPostIds(new Set(deletedPosts.map(p => p.id)));
+    setDeletedPosts(prevDeleted => {
+      setSelectedDeletedPostIds(new Set(prevDeleted.map(p => p.id)));
+      return prevDeleted;
+    });
     lastClickedDeletedIndexRef.current = null;
-  }, [deletedPosts]);
+  }, []);
 
   const deselectAllDeletedPosts = useCallback(() => {
     setSelectedDeletedPostIds(new Set());

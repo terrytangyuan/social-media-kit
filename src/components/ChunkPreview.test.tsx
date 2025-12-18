@@ -99,7 +99,9 @@ describe('ChunkPreview Component', () => {
       const longText = 'a'.repeat(400);
       render(<ChunkPreview {...defaultProps} text={longText} selectedPlatform="twitter" />);
 
-      expect(screen.getByText(/characters/)).toBeInTheDocument();
+      // Multiple chunks = multiple character counts
+      const charCountElements = screen.getAllByText(/characters/);
+      expect(charCountElements.length).toBeGreaterThan(0);
     });
 
     it('should render multiple chunks correctly', () => {
@@ -112,10 +114,13 @@ describe('ChunkPreview Component', () => {
 
     it('should preserve whitespace in chunks', () => {
       const textWithSpaces = 'Line 1\n\nLine 2\n\nLine 3';
-      render(<ChunkPreview {...defaultProps} text={textWithSpaces} />);
+      mockFormatForPlatform.mockImplementation((text: string) => text);
+      const { container } = render(<ChunkPreview {...defaultProps} text={textWithSpaces} />);
 
-      const content = screen.getByText(textWithSpaces);
+      const content = container.querySelector('.whitespace-pre-wrap');
+      expect(content).toBeInTheDocument();
       expect(content).toHaveClass('whitespace-pre-wrap');
+      expect(content?.textContent).toBe(textWithSpaces);
     });
   });
 
@@ -306,16 +311,22 @@ describe('ChunkPreview Component', () => {
 
     it('should adjust chunks based on selected platform', () => {
       const text = 'a'.repeat(400);
-      const { rerender } = render(<ChunkPreview {...defaultProps} text={text} selectedPlatform="twitter" />);
+      mockFormatForPlatform.mockImplementation((text: string) => text);
 
-      const twitterChunks = screen.getAllByText(/Part \d+ of \d+/);
+      const { rerender, container } = render(<ChunkPreview {...defaultProps} text={text} selectedPlatform="twitter" />);
+
+      let chunks = container.querySelectorAll('.whitespace-pre-wrap');
+      const twitterChunkCount = chunks.length;
+      expect(twitterChunkCount).toBeGreaterThan(1); // Should have multiple chunks for Twitter (280 limit)
 
       rerender(<ChunkPreview {...defaultProps} text={text} selectedPlatform="mastodon" />);
 
-      const mastodonChunks = screen.getAllByText(/Part \d+ of \d+/);
+      chunks = container.querySelectorAll('.whitespace-pre-wrap');
+      const mastodonChunkCount = chunks.length;
 
       // Twitter (280) and Mastodon (500) will have different chunk counts
-      expect(twitterChunks.length).not.toBe(mastodonChunks.length);
+      // 400 chars should be 2 chunks for Twitter but 1 chunk for Mastodon
+      expect(twitterChunkCount).toBeGreaterThan(mastodonChunkCount);
     });
   });
 
@@ -336,19 +347,31 @@ describe('ChunkPreview Component', () => {
 
     it('should handle special characters in text', () => {
       const specialText = 'Test <>&"\'\n\t';
-      render(<ChunkPreview {...defaultProps} text={specialText} />);
+      mockFormatForPlatform.mockImplementation((text: string) => text);
+      const { container } = render(<ChunkPreview {...defaultProps} text={specialText} />);
 
-      expect(screen.getByText(specialText)).toBeInTheDocument();
+      // Text should be formatted and rendered
+      expect(mockFormatForPlatform).toHaveBeenCalledWith(specialText, 'linkedin');
+      // Check that the text is in the document (may be in whitespace-pre-wrap element)
+      const content = container.querySelector('.whitespace-pre-wrap');
+      expect(content).toBeInTheDocument();
+      expect(content?.textContent).toBe(specialText);
     });
 
     it('should handle Unicode characters', () => {
       const unicodeText = '😀 Hello 世界 🌍';
-      render(<ChunkPreview {...defaultProps} text={unicodeText} />);
+      mockFormatForPlatform.mockImplementation((text: string) => text);
+      const { container } = render(<ChunkPreview {...defaultProps} text={unicodeText} />);
 
-      expect(screen.getByText(unicodeText)).toBeInTheDocument();
+      // Text should be formatted and rendered
+      expect(mockFormatForPlatform).toHaveBeenCalledWith(unicodeText, 'linkedin');
+      const content = container.querySelector('.whitespace-pre-wrap');
+      expect(content).toBeInTheDocument();
+      expect(content?.textContent).toBe(unicodeText);
     });
 
     it('should toggle between dark and light mode', () => {
+      mockFormatForPlatform.mockImplementation((text: string) => text);
       const { container, rerender } = render(<ChunkPreview {...defaultProps} text="Test" darkMode={false} />);
 
       expect(container.querySelector('.bg-gray-50')).toBeInTheDocument();
@@ -356,6 +379,7 @@ describe('ChunkPreview Component', () => {
       rerender(<ChunkPreview {...defaultProps} text="Test" darkMode={true} />);
 
       expect(container.querySelector('.bg-gray-700')).toBeInTheDocument();
+      expect(container.querySelector('.bg-gray-50')).not.toBeInTheDocument();
     });
   });
 });
