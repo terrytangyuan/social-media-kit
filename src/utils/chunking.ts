@@ -55,13 +55,93 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
       const textUpToLimit = graphemes.slice(0, limit).join('');
       const paragraphBreak = textUpToLimit.lastIndexOf('\n\n');
       if (paragraphBreak > textUpToLimit.length * 0.3) {
-        return paragraphBreak + 2;
+        // Check if the text after the paragraph break starts with a list marker
+        const afterBreak = textUpToLimit.substring(paragraphBreak + 2);
+        const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+
+        // If it's a list item, check if we can include it, otherwise DON'T use this break
+        if (listMarkerPattern.test(afterBreak)) {
+          // Find the end of this list item (next paragraph or line break)
+          const nextParagraphBreak = afterBreak.indexOf('\n\n');
+          const nextLineBreak = afterBreak.indexOf('\n');
+          let listItemEnd: number;
+
+          if (nextParagraphBreak !== -1 && (nextLineBreak === -1 || nextParagraphBreak < nextLineBreak)) {
+            listItemEnd = nextParagraphBreak;
+          } else if (nextLineBreak !== -1) {
+            listItemEnd = nextLineBreak;
+          } else {
+            listItemEnd = afterBreak.length;
+          }
+
+          // If the complete list item fits within our grapheme limit, include it
+          const splitter = new GraphemeSplitter();
+          const listItemGraphemes = splitter.countGraphemes(textUpToLimit.substring(0, paragraphBreak + 2 + listItemEnd));
+
+          if (listItemGraphemes <= limit) {
+            return paragraphBreak + 2 + listItemEnd;
+          } else {
+            // List item is too long - we can't include it
+            // Break BEFORE the paragraph that precedes this list item
+            // This ensures the list item starts fresh in the next chunk
+            const textBeforeParagraph = textUpToLimit.substring(0, paragraphBreak);
+
+            // Try to find a sentence ending before this paragraph
+            const sentenceMarkers = ['. ', '? ', '! '];
+            let lastSentenceEnd = -1;
+            for (const marker of sentenceMarkers) {
+              const pos = textBeforeParagraph.lastIndexOf(marker);
+              if (pos > lastSentenceEnd) {
+                lastSentenceEnd = pos;
+              }
+            }
+            if (lastSentenceEnd > textBeforeParagraph.length * 0.3) {
+              return lastSentenceEnd + 2;
+            }
+
+            // Try previous paragraph break
+            const prevParagraphBreak = textBeforeParagraph.lastIndexOf('\n\n');
+            if (prevParagraphBreak > 0) {
+              return prevParagraphBreak + 2;
+            }
+
+            // Last resort: break right before this paragraph (before the \n\n)
+            return paragraphBreak;
+          }
+        } else {
+          return paragraphBreak + 2;
+        }
       }
 
-      // Look for line breaks
+      // Look for line breaks, but avoid breaking numbered/bulleted lists
       const lineBreak = textUpToLimit.lastIndexOf('\n');
       if (lineBreak > textUpToLimit.length * 0.5) {
-        return lineBreak + 1;
+        // Check if the text after the line break starts with a list marker
+        const afterBreak = textUpToLimit.substring(lineBreak + 1);
+        const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+
+        // If it's a list item, check if we can include it, otherwise find a previous break
+        if (listMarkerPattern.test(afterBreak)) {
+          // Find the end of this list item (next line break or limit)
+          const nextLineBreak = afterBreak.indexOf('\n');
+          const listItemEnd = nextLineBreak === -1 ? afterBreak.length : nextLineBreak;
+
+          // If the complete list item fits within our grapheme limit, include it
+          const splitter = new GraphemeSplitter();
+          const listItemGraphemes = splitter.countGraphemes(textUpToLimit.substring(0, lineBreak + 1 + listItemEnd));
+
+          if (listItemGraphemes <= limit) {
+            return lineBreak + 1 + listItemEnd;
+          } else {
+            // List item is too long to fit, find a previous break point
+            const prevLineBreak = textUpToLimit.lastIndexOf('\n', lineBreak - 1);
+            if (prevLineBreak > textUpToLimit.length * 0.3) {
+              return prevLineBreak + 1;
+            }
+          }
+        } else {
+          return lineBreak + 1;
+        }
       }
 
       // Look for word boundaries (spaces)
@@ -98,13 +178,87 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
   // Look for paragraph breaks (natural content break)
   const paragraphBreak = text.lastIndexOf('\n\n', limit - 2);
   if (paragraphBreak > limit * 0.3) {
-    return paragraphBreak + 2;
+    // Check if the text after the paragraph break starts with a list marker
+    const afterBreak = text.substring(paragraphBreak + 2);
+    const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+
+    // If it's a list item, check if we can include it, otherwise DON'T use this break
+    if (listMarkerPattern.test(afterBreak)) {
+      // Find the end of this list item (next paragraph or line break)
+      const nextParagraphBreak = afterBreak.indexOf('\n\n');
+      const nextLineBreak = afterBreak.indexOf('\n');
+      let listItemEnd: number;
+
+      if (nextParagraphBreak !== -1 && (nextLineBreak === -1 || nextParagraphBreak < nextLineBreak)) {
+        listItemEnd = nextParagraphBreak;
+      } else if (nextLineBreak !== -1) {
+        listItemEnd = nextLineBreak;
+      } else {
+        listItemEnd = afterBreak.length;
+      }
+
+      // If the complete list item fits, include it
+      if (paragraphBreak + 2 + listItemEnd <= limit) {
+        return paragraphBreak + 2 + listItemEnd;
+      } else {
+        // List item is too long - we can't include it
+        // Break BEFORE the paragraph that precedes this list item
+        // This ensures the list item starts fresh in the next chunk
+        const textBeforeParagraph = text.substring(0, paragraphBreak);
+
+        // Try to find a sentence ending before this paragraph
+        const sentenceMarkers = ['. ', '? ', '! '];
+        let lastSentenceEnd = -1;
+        for (const marker of sentenceMarkers) {
+          const pos = textBeforeParagraph.lastIndexOf(marker);
+          if (pos > lastSentenceEnd) {
+            lastSentenceEnd = pos;
+          }
+        }
+        if (lastSentenceEnd > textBeforeParagraph.length * 0.3) {
+          return lastSentenceEnd + 2;
+        }
+
+        // Try previous paragraph break
+        const prevParagraphBreak = textBeforeParagraph.lastIndexOf('\n\n');
+        if (prevParagraphBreak > 0) {
+          return prevParagraphBreak + 2;
+        }
+
+        // Last resort: break right before this paragraph (before the \n\n)
+        return paragraphBreak;
+      }
+    } else {
+      return paragraphBreak + 2;
+    }
   }
 
-  // Look for line breaks
+  // Look for line breaks, but avoid breaking numbered/bulleted lists
   const lineBreak = text.lastIndexOf('\n', limit - 1);
   if (lineBreak > limit * 0.5) {
-    return lineBreak + 1;
+    // Check if the text after the line break starts with a list marker
+    const afterBreak = text.substring(lineBreak + 1);
+    const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+
+    // If it's a list item, check if we can include it, otherwise find a previous break
+    if (listMarkerPattern.test(afterBreak)) {
+      // Find the end of this list item (next line break or limit)
+      const nextLineBreak = afterBreak.indexOf('\n');
+      const listItemEnd = nextLineBreak === -1 ? afterBreak.length : nextLineBreak;
+
+      // If the complete list item fits, include it
+      if (lineBreak + 1 + listItemEnd <= limit) {
+        return lineBreak + 1 + listItemEnd;
+      } else {
+        // List item is too long to fit, find a previous break point
+        const prevLineBreak = text.lastIndexOf('\n', lineBreak - 1);
+        if (prevLineBreak > limit * 0.3) {
+          return prevLineBreak + 1;
+        }
+      }
+    } else {
+      return lineBreak + 1;
+    }
   }
 
   // Look for word boundaries (spaces)
@@ -142,6 +296,7 @@ export const chunkText = (
 
     // Extract chunk and clean up
     let chunk = remainingText.substring(0, breakPoint).replace(/\s+$/, ''); // Remove trailing whitespace
+    let actualChunkLength = breakPoint; // Track the actual length to remove from remainingText
 
     // Ensure chunk doesn't exceed limit after cleanup
     if (getPlatformTextLength(chunk, platform) > limit) {
@@ -152,12 +307,25 @@ export const chunkText = (
       if (lastSpace > limit * 0.8) {
         chunk = chunk.substring(0, lastSpace);
       }
+      actualChunkLength = chunk.length;
+    }
+
+    // CRITICAL: Check if chunk ends with an orphaned list marker
+    // If it does, remove it so it appears in the next chunk instead
+    const lines = chunk.split('\n');
+    const lastLine = lines[lines.length - 1]?.trim();
+    if (lastLine && /^\d+[\.\)]\s*$/.test(lastLine)) {
+      // Last line is ONLY a list marker - remove it
+      lines.pop();
+      chunk = lines.join('\n').replace(/\s+$/, '');
+      // Find where this orphaned marker started in the original text
+      actualChunkLength = chunk.length;
     }
 
     chunks.push(chunk);
 
     // Remove processed text and clean up leading whitespace
-    remainingText = remainingText.substring(chunk.length).replace(/^\s+/, '');
+    remainingText = remainingText.substring(actualChunkLength).replace(/^\s+/, '');
   }
 
   // Final safety check: ensure no chunk exceeds limit

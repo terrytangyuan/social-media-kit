@@ -311,5 +311,257 @@ If building next-generation distributed AI systems excites you, we'd love to hea
         }
       });
     });
+
+    describe('List item handling', () => {
+      it('should keep numbered list items together with their content', () => {
+        const text = `Introduction text here.
+
+1. First item with some content
+2. Second item with content
+3. Third item with more content`;
+
+        const chunks = chunkText(text, 'twitter', platformLimits);
+
+        // No chunk should start with just a number and period without content
+        chunks.forEach(chunk => {
+          // If a chunk starts with a list marker, it should have content on the same line
+          const lines = chunk.split('\n');
+          lines.forEach(line => {
+            if (/^\d+[\.\)]\s*$/.test(line.trim())) {
+              // This line has ONLY a list marker with no content - this is the bug
+              throw new Error(`Found orphaned list marker: "${line}"`);
+            }
+          });
+        });
+      });
+
+      it('should handle numbered list items with long URLs', () => {
+        const text = `https://www.linkedin.com/in/terrytangyuan/
+
+1. Principal Machine Learning Engineer, AI Inference: https://redhat.wd5.myworkdayjobs.com/jobs/job/Boston/Principal-Machine-Learning-Engineer--AI-Inference_R-050966-2
+
+2. Senior Machine Learning Engineer, LLM Compressor and Quantization: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Senior-Machine-Learning-Engineer--LLM-Compressor-and-Quantization_R-047155-1
+
+3. Principal Machine Learning Engineer, Distributed vLLM Inference: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Boston/Principal-Machine-Learning-Engineer--Distributed-vLLM-Inference_R-050962-1`;
+
+        const chunks = chunkText(text, 'linkedin', platformLimits);
+
+        // Verify no orphaned list markers
+        chunks.forEach((chunk, index) => {
+          const lines = chunk.split('\n');
+          lines.forEach(line => {
+            const trimmed = line.trim();
+            // Check if line is ONLY a list marker (number + period/paren + optional space)
+            if (/^\d+[\.\)]\s*$/.test(trimmed)) {
+              throw new Error(`Chunk ${index + 1} has orphaned list marker: "${trimmed}"`);
+            }
+          });
+        });
+
+        // Verify each numbered item stays with its content
+        const allText = chunks.join(' ');
+        expect(allText).toContain('1. Principal');
+        expect(allText).toContain('2. Senior');
+        expect(allText).toContain('3. Principal');
+      });
+
+      it('should handle full user job posting with unicode formatting without breaking list items', () => {
+        // This is the user's post WITH Unicode bold/italic formatting (as shown in preview)
+        const text = `🚀 𝗠𝗼𝗿𝗲 𝗽𝗼𝘀𝗶𝘁𝗶𝗼𝗻𝘀 𝗮𝗿𝗲 𝗼𝗽𝗲𝗻 𝗮𝘁 𝗥𝗲𝗱 𝗛𝗮𝘁 𝗔𝗜!
+
+Our 𝗜𝗻𝗳𝗲𝗿𝗲𝗻𝗰𝗲 𝗘𝗻𝗴𝗶𝗻𝗲𝗲𝗿𝗶𝗻𝗴 team continues to grow with ML engineer, researcher, and developer advocate positions! We're looking for passionate candidates to help us push the boundaries of 𝗔𝗜/𝗟𝗟𝗠 𝗶𝗻𝗳𝗲𝗿𝗲𝗻𝗰𝗲 and contribute directly to open source projects like vLLM and llm-d.
+
+📩 Please check out these job postings and 𝗲𝗺𝗮𝗶𝗹 𝗺𝗲 (address in my profile) with a short summary of your background + your resume. https://www.linkedin.com/in/terrytangyuan/
+
+1. Principal Machine Learning Engineer, AI Inference: https://redhat.wd5.myworkdayjobs.com/jobs/job/Boston/Principal-Machine-Learning-Engineer--AI-Inference_R-050966-2
+
+2. Senior Machine Learning Engineer, LLM Compressor and Quantization: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Senior-Machine-Learning-Engineer--LLM-Compressor-and-Quantization_R-047155-1
+
+3. Principal Machine Learning Engineer, Distributed vLLM Inference: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Boston/Principal-Machine-Learning-Engineer--Distributed-vLLM-Inference_R-050962-1
+
+4. Machine Learning Engineer, vLLM Inference, Tool Calling and Structured Output: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Machine-Learning-Engineer--vLLM-Inference---Tool-Calling-and-Structured-Output_R-052780
+
+5. Machine Learning Systems Research Intern, PhD, Summer 2026: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/jobs/details/Machine-Learning-Systems-Research-Intern--PhD--Summer-2026_R-052661?q=machine+learning+research+intern
+
+6: AI Developer Advocate: https://redhat.wd5.myworkdayjobs.com/Jobs/job/Boston/AI-Developer-Advocate_R-052430
+
+If you are curious about what our teams are working on with open source communities, check out this newsletter that we recently launched! https://inferenceops.substack.com/
+
+👉 Not looking right now? Know someone who'd be a great fit? Tag them in the comments or share this post!
+
+#Hiring #WereHiring #NowHiring #JoinOurTeam #JobOpening #CareerOpportunity #JobSearch #HiringAlert  #OpenRoles  #SoftwareEngineering #KubernetesJobs #CloudNative #AIJobs #MLOps #DevOpsJobs #Careers #GrowthOpportunities #HiringTalent #CFBR`;
+
+        console.log('Text length:', text.length);
+        const chunks = chunkText(text, 'linkedin', platformLimits);
+
+        // Debug: Print all chunks
+        console.log('\n=== CHUNKS ===');
+        chunks.forEach((chunk, index) => {
+          console.log(`\nChunk ${index + 1} (${chunk.length} chars):`);
+          console.log(chunk);
+          console.log('='.repeat(50));
+        });
+
+        // Critical: No chunk should have ONLY a number followed by period/paren
+        chunks.forEach((chunk, index) => {
+          const lines = chunk.split('\n');
+          lines.forEach((line, lineIndex) => {
+            const trimmed = line.trim();
+            // Check if this line is ONLY a list marker with nothing after it
+            if (/^\d+[\.\)]\s*$/.test(trimmed)) {
+              console.error(`\nERROR: Chunk ${index + 1}, Line ${lineIndex + 1}: "${line}"`);
+              console.error('Full chunk:', chunk);
+              throw new Error(`Found orphaned list marker at chunk ${index + 1}: "${trimmed}"`);
+            }
+          });
+        });
+
+        // Each list item number should be on the same line/chunk as its description
+        for (let i = 1; i <= 6; i++) {
+          chunks.forEach((chunk, chunkIndex) => {
+            const regex = new RegExp(`${i}[\.:]\\s*([^\\n]*)`);
+            const match = chunk.match(regex);
+            if (match) {
+              const contentAfter = match[1].trim();
+              if (contentAfter.length === 0) {
+                console.error(`\nERROR: Found "${i}." without content`);
+                console.error('Chunk:', chunk);
+                throw new Error(`Chunk ${chunkIndex + 1}: Found "${i}." without content on same line`);
+              }
+              // Content should have some meaningful text, not just be empty
+              expect(contentAfter.length).toBeGreaterThan(10);
+            }
+          });
+        }
+      });
+
+      it('should handle bulleted lists', () => {
+        const text = `Introduction:
+
+- First bullet point
+- Second bullet point
+* Third bullet point
+• Fourth bullet point`;
+
+        const chunks = chunkText(text, 'twitter', platformLimits);
+
+        chunks.forEach(chunk => {
+          const lines = chunk.split('\n');
+          lines.forEach(line => {
+            // No line should be ONLY a bullet marker
+            if (/^[-*•]\s*$/.test(line.trim())) {
+              throw new Error(`Found orphaned bullet marker: "${line}"`);
+            }
+          });
+        });
+      });
+
+      it('should handle user job posting for Bluesky without breaking list items', () => {
+        // User's actual post for Bluesky (300 grapheme limit)
+        const text = `🚀 More positions are open at Red Hat AI!
+
+Our Inference Engineering team continues to grow with ML engineer, researcher, and developer advocate positions! We're looking for passionate candidates to help us push the boundaries of AI/LLM inference and contribute directly to open source projects like vLLM and llm-d.
+
+📩 Please check out these job postings and email me (address in my profile) with a short summary of your background + your resume. https://www.linkedin.com/in/terrytangyuan/
+
+1. Principal Machine Learning Engineer, AI Inference: https://redhat.wd5.myworkdayjobs.com/jobs/job/Boston/Principal-Machine-Learning-Engineer--AI-Inference_R-050966-2
+
+2. Senior Machine Learning Engineer, LLM Compressor and Quantization: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Senior-Machine-Learning-Engineer--LLM-Compressor-and-Quantization_R-047155-1
+
+3. Principal Machine Learning Engineer, Distributed vLLM Inference: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Boston/Principal-Machine-Learning-Engineer--Distributed-vLLM-Inference_R-050962-1
+
+4. Machine Learning Engineer, vLLM Inference, Tool Calling and Structured Output: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Machine-Learning-Engineer--vLLM-Inference---Tool-Calling-and-Structured-Output_R-052780
+
+5. Machine Learning Systems Research Intern, PhD, Summer 2026: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/jobs/details/Machine-Learning-Systems-Research-Intern--PhD--Summer-2026_R-052661?q=machine+learning+research+intern
+
+6: AI Developer Advocate: https://redhat.wd5.myworkdayjobs.com/Jobs/job/Boston/AI-Developer-Advocate_R-052430
+
+If you are curious about what our teams are working on with open source communities, check out this newsletter that we recently launched! https://inferenceops.substack.com/
+
+👉 Not looking right now? Know someone who'd be a great fit? Tag them in the comments or share this post!
+
+#Hiring #WereHiring #NowHiring #JoinOurTeam #JobOpening #CareerOpportunity #JobSearch #HiringAlert  #OpenRoles  #SoftwareEngineering #KubernetesJobs #CloudNative #AIJobs #MLOps #DevOpsJobs #Careers #GrowthOpportunities #HiringTalent #CFBR`;
+
+        console.log('\n=== BLUESKY TEST (300 grapheme limit) ===');
+        console.log('Text length:', text.length);
+
+        const chunks = chunkText(text, 'bluesky', platformLimits);
+
+        console.log(`Number of chunks: ${chunks.length}\n`);
+        chunks.forEach((chunk, index) => {
+          const graphemeCount = getPlatformTextLength(chunk, 'bluesky');
+          console.log(`Chunk ${index + 1} (${graphemeCount} graphemes, ${chunk.length} chars):`);
+          console.log(chunk);
+          console.log('='.repeat(70));
+        });
+
+        // Verify no orphaned list markers
+        chunks.forEach((chunk, index) => {
+          const lines = chunk.split('\n');
+          lines.forEach((line, lineIndex) => {
+            const trimmed = line.trim();
+            if (/^\d+[\.\)]\s*$/.test(trimmed)) {
+              console.error(`\nERROR in Bluesky chunk ${index + 1}, line ${lineIndex + 1}:`);
+              console.error(`Found orphaned: "${trimmed}"`);
+              console.error('Full chunk:', chunk);
+              throw new Error(`Bluesky: Found orphaned list marker "${trimmed}" in chunk ${index + 1}`);
+            }
+          });
+        });
+      });
+
+      it('should handle user job posting for Mastodon without breaking list items', () => {
+        // User's actual post for Mastodon (500 char limit)
+        const text = `🚀 More positions are open at Red Hat AI!
+
+Our Inference Engineering team continues to grow with ML engineer, researcher, and developer advocate positions! We're looking for passionate candidates to help us push the boundaries of AI/LLM inference and contribute directly to open source projects like vLLM and llm-d.
+
+📩 Please check out these job postings and email me (address in my profile) with a short summary of your background + your resume. https://www.linkedin.com/in/terrytangyuan/
+
+1. Principal Machine Learning Engineer, AI Inference: https://redhat.wd5.myworkdayjobs.com/jobs/job/Boston/Principal-Machine-Learning-Engineer--AI-Inference_R-050966-2
+
+2. Senior Machine Learning Engineer, LLM Compressor and Quantization: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Senior-Machine-Learning-Engineer--LLM-Compressor-and-Quantization_R-047155-1
+
+3. Principal Machine Learning Engineer, Distributed vLLM Inference: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Boston/Principal-Machine-Learning-Engineer--Distributed-vLLM-Inference_R-050962-1
+
+4. Machine Learning Engineer, vLLM Inference, Tool Calling and Structured Output: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/job/Machine-Learning-Engineer--vLLM-Inference---Tool-Calling-and-Structured-Output_R-052780
+
+5. Machine Learning Systems Research Intern, PhD, Summer 2026: https://redhat.wd5.myworkdayjobs.com/en-US/jobs/jobs/details/Machine-Learning-Systems-Research-Intern--PhD--Summer-2026_R-052661?q=machine+learning+research+intern
+
+6: AI Developer Advocate: https://redhat.wd5.myworkdayjobs.com/Jobs/job/Boston/AI-Developer-Advocate_R-052430
+
+If you are curious about what our teams are working on with open source communities, check out this newsletter that we recently launched! https://inferenceops.substack.com/
+
+👉 Not looking right now? Know someone who'd be a great fit? Tag them in the comments or share this post!
+
+#Hiring #WereHiring #NowHiring #JoinOurTeam #JobOpening #CareerOpportunity #JobSearch #HiringAlert  #OpenRoles  #SoftwareEngineering #KubernetesJobs #CloudNative #AIJobs #MLOps #DevOpsJobs #Careers #GrowthOpportunities #HiringTalent #CFBR`;
+
+        console.log('\n=== MASTODON TEST (500 char limit) ===');
+        console.log('Text length:', text.length);
+
+        const chunks = chunkText(text, 'mastodon', platformLimits);
+
+        console.log(`Number of chunks: ${chunks.length}\n`);
+        chunks.forEach((chunk, index) => {
+          console.log(`Chunk ${index + 1} (${chunk.length} chars):`);
+          console.log(chunk);
+          console.log('='.repeat(70));
+        });
+
+        // Verify no orphaned list markers
+        chunks.forEach((chunk, index) => {
+          const lines = chunk.split('\n');
+          lines.forEach((line, lineIndex) => {
+            const trimmed = line.trim();
+            if (/^\d+[\.\)]\s*$/.test(trimmed)) {
+              console.error(`\nERROR in Mastodon chunk ${index + 1}, line ${lineIndex + 1}:`);
+              console.error(`Found orphaned: "${trimmed}"`);
+              console.error('Full chunk:', chunk);
+              throw new Error(`Mastodon: Found orphaned list marker "${trimmed}" in chunk ${index + 1}`);
+            }
+          });
+        });
+      });
+    });
   });
 });
