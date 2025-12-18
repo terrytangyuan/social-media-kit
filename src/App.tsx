@@ -2483,11 +2483,22 @@ function App() {
           // Calculate position relative to textarea (not viewport)
           const paddingLeft = parseFloat(window.getComputedStyle(textarea).paddingLeft) || 16;
           const paddingTop = parseFloat(window.getComputedStyle(textarea).paddingTop) || 16;
-          
-          // Position relative to the textarea element, not the viewport
-          const top = paddingTop + (linesBeforeAt.length - 1) * lineHeight + lineHeight;
-          const left = paddingLeft + textWidth;
-          
+
+          // Position relative to the textarea element, accounting for scroll
+          // Subtract scrollTop to adjust for textarea scrolling
+          const top = paddingTop + (linesBeforeAt.length - 1) * lineHeight + lineHeight - textarea.scrollTop;
+          let left = paddingLeft + textWidth - textarea.scrollLeft;
+
+          // Constrain the autocomplete to stay within reasonable bounds
+          // If it would be positioned too far right, constrain it
+          const textareaWidth = textarea.offsetWidth;
+          const autocompleteWidth = 256; // w-64 = 16rem = 256px
+          const maxLeft = textareaWidth - autocompleteWidth - 20; // Leave some margin
+
+          if (left > maxLeft) {
+            left = Math.max(paddingLeft, maxLeft);
+          }
+
           setTagAutocompletePosition({ top, left });
           setShowTagAutocomplete(true);
         }
@@ -2538,7 +2549,7 @@ function App() {
 
   return (
     <div className={`${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} min-h-screen p-6`}>
-      <div className={`max-w-4xl mx-auto p-6 rounded-2xl shadow-lg ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+      <div className={`max-w-4xl mx-auto p-6 rounded-2xl shadow-lg overflow-x-hidden ${darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-2xl font-bold">Social Media Kit</h1>
           <div className="flex items-center gap-3">

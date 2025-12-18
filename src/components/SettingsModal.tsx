@@ -154,17 +154,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                    Instance URL
+                    Mastodon Instance URL
                   </label>
                   <input
                     type="text"
-                    value={oauthConfig.mastodon.instanceUrl}
+                    value={oauthConfig.mastodon.instanceUrl || 'https://mastodon.social'}
                     disabled
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-800 border-gray-600 text-gray-500" : "bg-gray-100 border-gray-300 text-gray-600"} cursor-not-allowed`}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-800"}`}
                     placeholder="https://mastodon.social"
                   />
                   <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    Instance URL is configured in server settings (default: https://mastodon.social)
+                    Configured via MASTODON_INSTANCE_URL in .env file (current: {oauthConfig.mastodon.instanceUrl || 'https://mastodon.social'})
                   </p>
                 </div>
               </div>

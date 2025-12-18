@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { TagAutocompleteProps, TagSuggestion } from "../types";
 
 export const TagAutocomplete = ({ suggestions, onSelect, onClose, position, darkMode, filter }: TagAutocompleteProps) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [adjustedPosition, setAdjustedPosition] = useState(position);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Filter suggestions based on the current filter
@@ -15,6 +16,54 @@ export const TagAutocomplete = ({ suggestions, onSelect, onClose, position, dark
   useEffect(() => {
     setSelectedIndex(0);
   }, [filter]);
+
+  // Adjust position to prevent overflow outside the viewport
+  useLayoutEffect(() => {
+    if (listRef.current) {
+      const autocompleteRect = listRef.current.getBoundingClientRect();
+      const parentElement = listRef.current.parentElement;
+
+      if (parentElement) {
+        const parentRect = parentElement.getBoundingClientRect();
+        const newPosition = { ...position };
+
+        // Get autocomplete dimensions
+        const autocompleteWidth = autocompleteRect.width || 256;
+        const autocompleteHeight = autocompleteRect.height || 192; // max-h-48 = 12rem = 192px
+
+        // Check if autocomplete would overflow to the right of the viewport
+        const absoluteLeft = parentRect.left + position.left;
+        if (absoluteLeft + autocompleteWidth > window.innerWidth - 20) {
+          // Position to the left of the cursor instead
+          newPosition.left = Math.max(0, position.left - autocompleteWidth);
+        }
+
+        // Also check if it would overflow the parent container to the right
+        if (newPosition.left + autocompleteWidth > parentRect.width) {
+          newPosition.left = Math.max(0, parentRect.width - autocompleteWidth - 20);
+        }
+
+        // Ensure it doesn't go off the left edge
+        if (newPosition.left < 0) {
+          newPosition.left = 20; // Add some padding from the left edge
+        }
+
+        // Check if autocomplete would overflow at the bottom of the viewport
+        const absoluteTop = parentRect.top + position.top;
+        if (absoluteTop + autocompleteHeight > window.innerHeight - 20) {
+          // Position above the cursor instead
+          newPosition.top = Math.max(20, position.top - autocompleteHeight - 20);
+        }
+
+        // Ensure it doesn't go off the top edge
+        if (newPosition.top < 0) {
+          newPosition.top = 20;
+        }
+
+        setAdjustedPosition(newPosition);
+      }
+    }
+  }, [position]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -69,8 +118,8 @@ export const TagAutocomplete = ({ suggestions, onSelect, onClose, position, dark
           : "bg-white border-gray-300 text-gray-800"
       }`}
       style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
+        top: `${adjustedPosition.top}px`,
+        left: `${adjustedPosition.left}px`,
       }}
       ref={listRef}
     >

@@ -76,6 +76,9 @@ app.use(express.static('public', {
 
 // OAuth configuration endpoint
 app.get('/api/oauth/config', (req, res) => {
+  const mastodonInstanceUrl = process.env.MASTODON_INSTANCE_URL || 'https://mastodon.social';
+  console.log('📋 OAuth Config Request - Mastodon Instance URL from env:', mastodonInstanceUrl);
+
   const config = {
     linkedin: {
       clientId: process.env.LINKEDIN_CLIENT_ID || '',
@@ -93,13 +96,13 @@ app.get('/api/oauth/config', (req, res) => {
       clientId: process.env.MASTODON_CLIENT_ID || '',
       redirectUri: req.get('origin') || 'http://localhost:3000',
       scope: 'read write',
-      instanceUrl: process.env.MASTODON_INSTANCE_URL || 'https://mastodon.social'
+      instanceUrl: mastodonInstanceUrl
     },
     bluesky: {
       server: 'https://bsky.social'
     }
   };
-  
+
   res.json(config);
 });
 
