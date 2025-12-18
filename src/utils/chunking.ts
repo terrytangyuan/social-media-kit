@@ -57,7 +57,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
       if (paragraphBreak > textUpToLimit.length * 0.3) {
         // Check if the text after the paragraph break starts with a list marker
         const afterBreak = textUpToLimit.substring(paragraphBreak + 2);
-        const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+        const listMarkerPattern = /^(\d+[.)]\s|[-*•]\s)/;
 
         // If it's a list item, check if we can include it, otherwise DON'T use this break
         if (listMarkerPattern.test(afterBreak)) {
@@ -118,7 +118,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
       if (lineBreak > textUpToLimit.length * 0.5) {
         // Check if the text after the line break starts with a list marker
         const afterBreak = textUpToLimit.substring(lineBreak + 1);
-        const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+        const listMarkerPattern = /^(\d+[.)]\s|[-*•]\s)/;
 
         // If it's a list item, check if we can include it, otherwise find a previous break
         if (listMarkerPattern.test(afterBreak)) {
@@ -180,7 +180,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
   if (paragraphBreak > limit * 0.3) {
     // Check if the text after the paragraph break starts with a list marker
     const afterBreak = text.substring(paragraphBreak + 2);
-    const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+    const listMarkerPattern = /^(\d+[.)]\s|[-*•]\s)/;
 
     // If it's a list item, check if we can include it, otherwise DON'T use this break
     if (listMarkerPattern.test(afterBreak)) {
@@ -238,7 +238,7 @@ export const findBestBreakPoint = (text: string, limit: number, platform: Platfo
   if (lineBreak > limit * 0.5) {
     // Check if the text after the line break starts with a list marker
     const afterBreak = text.substring(lineBreak + 1);
-    const listMarkerPattern = /^(\d+[\.\)]\s|[-*•]\s)/;
+    const listMarkerPattern = /^(\d+[.)]\s|[-*•]\s)/;
 
     // If it's a list item, check if we can include it, otherwise find a previous break
     if (listMarkerPattern.test(afterBreak)) {
@@ -314,7 +314,7 @@ export const chunkText = (
     // If it does, remove it so it appears in the next chunk instead
     const lines = chunk.split('\n');
     const lastLine = lines[lines.length - 1]?.trim();
-    if (lastLine && /^\d+[\.\)]\s*$/.test(lastLine)) {
+    if (lastLine && /^\d+[.)]\s*$/.test(lastLine)) {
       // Last line is ONLY a list marker - remove it
       lines.pop();
       chunk = lines.join('\n').replace(/\s+$/, '');
