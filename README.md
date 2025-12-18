@@ -172,11 +172,11 @@ docker-compose up -d
 ### Using Pre-built Image
 
 ```bash
-# Pull from Docker Hub
-docker pull terrytangyuan/social-media-kit:latest
+# Pull from GitHub Container Registry
+docker pull ghcr.io/terrytangyuan/social-media-kit:latest
 
 # Run with your .env file
-docker run -d -p 3000:3000 --env-file .env terrytangyuan/social-media-kit:latest
+docker run -d -p 3000:3000 --env-file .env ghcr.io/terrytangyuan/social-media-kit:latest
 ```
 
 📋 **For detailed Docker instructions, see [Docker Deployment Guide](DOCKER.md)**

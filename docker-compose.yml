@@ -2,9 +2,15 @@ version: '3.8'
 
 services:
   social-media-kit:
+    # Option 1: Build locally from source
     build:
       context: .
       dockerfile: Dockerfile
+
+    # Option 2: Use pre-built image from GitHub Container Registry
+    # Uncomment the line below and comment out the 'build' section above
+    # image: ghcr.io/terrytangyuan/social-media-kit:latest
+
     container_name: social-media-kit
     ports:
       - "3000:3000"

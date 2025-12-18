@@ -72,20 +72,20 @@ docker stop social-media-kit
 docker rm social-media-kit
 ```
 
-### Option 3: Using Pre-built Image from Docker Hub
+### Option 3: Using Pre-built Image from GitHub Container Registry
 
 Once published, you can use the pre-built image:
 
 ```bash
 # Pull the latest image
-docker pull terrytangyuan/social-media-kit:latest
+docker pull ghcr.io/terrytangyuan/social-media-kit:latest
 
 # Run the container
 docker run -d \
   --name social-media-kit \
   -p 3000:3000 \
   --env-file .env \
-  terrytangyuan/social-media-kit:latest
+  ghcr.io/terrytangyuan/social-media-kit:latest
 ```
 
 ## Environment Variables
@@ -182,7 +182,7 @@ docker run -d \
   -e TWITTER_CLIENT_ID="your-twitter-client-id" \
   -e TWITTER_CLIENT_SECRET="your-twitter-client-secret" \
   # ... add other environment variables
-  terrytangyuan/social-media-kit:latest
+  ghcr.io/terrytangyuan/social-media-kit:latest
 ```
 
 ### Using Docker Secrets (Docker Swarm)
@@ -201,7 +201,7 @@ version: '3.8'
 
 services:
   social-media-kit:
-    image: terrytangyuan/social-media-kit:latest
+    image: ghcr.io/terrytangyuan/social-media-kit:latest
     ports:
       - "3000:3000"
     environment:
@@ -274,7 +274,7 @@ version: '3.8'
 
 services:
   social-media-kit:
-    image: terrytangyuan/social-media-kit:latest
+    image: ghcr.io/terrytangyuan/social-media-kit:latest
     env_file:
       - .env
     labels:
@@ -433,7 +433,7 @@ docker logs --tail 100 social-media-kit
 
 ```bash
 # Pull latest image
-docker pull terrytangyuan/social-media-kit:latest
+docker pull ghcr.io/terrytangyuan/social-media-kit:latest
 
 # Recreate container
 docker-compose down
