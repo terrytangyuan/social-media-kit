@@ -61,9 +61,10 @@
         "name": "llm-d",
         "displayName": "llm-d",
         "twitter": "_llm_d_",
-        "bluesky": "",
+        "bluesky": "llm-d.ai",
         "createdAt": "2025-07-25T01:44:45.333Z",
-        "updatedAt": "2025-07-25T01:44:45.333Z"
+        "updatedAt": "2026-01-13T00:27:35.722Z",
+        "mastodon": ""
       },
       {
         "id": "1754012202798",
@@ -117,6 +118,6 @@
       }
     ]
   },
-  "exportedAt": "2025-08-14T01:49:43.734Z",
+  "exportedAt": "2026-01-13T00:27:38.189Z",
   "appVersion": "0.2.1"
 }
